@@ -1,0 +1,13 @@
+# Packager output
+.release/
+*.zip
+
+# Texture generator previews
+*_preview*.png
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store

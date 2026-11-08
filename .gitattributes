@@ -1,2 +1,9 @@
-# Auto detect text files and perform LF normalization
+# Normalise line endings so diffs stay clean between editors.
 * text=auto
+*.lua text eol=lf
+*.toc text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.tga binary
+*.gif binary
+*.png binary

@@ -1,0 +1,19 @@
+# BigWigs packager configuration: https://github.com/BigWigsMods/packager/wiki/Preparing-the-PackageMeta-File
+# Push a tag such as v1.0.0 to build VenStore-v1.0.0.zip (see .github/workflows/release.yml).
+# The tag replaces @project-version@ in VenStore.toc.
+package-as: VenStore
+
+# Release notes for CurseForge / Wago / GitHub come from the changelog file.
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+# Files kept in the repository but left out of the release zip.
+ignore:
+  - README.md
+  - tools
+  - .github
+  - .gitignore
+  - .gitattributes
+  - "*.png"
+  - media
