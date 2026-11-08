@@ -295,8 +295,7 @@ end
 local function FillBuybackSlot(btn, buybackIndex)
     local name, texture, price, quantity, _, isUsable = GetBuybackItemInfo(buybackIndex)
     btn.merchantIndex, btn.buybackIndex = nil, buybackIndex
-    local priceStr = (C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString and price)
-        and C_CurrencyInfo.GetCoinTextureString(price, 10) or tostring(price or "")
+    local priceStr = addon.CoinString(price, 10)
     PaintSlot(btn, name, texture, quantity, isUsable, GetBuybackItemLink(buybackIndex), priceStr, "Buy back")
 end
 

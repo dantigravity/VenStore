@@ -2,7 +2,7 @@
 
 ![VenStore in action](media/venstore.gif)
 
-VenStore replaces the merchant window in World of Warcraft (Retail) with a wooden shop interior. Items sit on shelves with hanging price cards. Cosmetics can be tried on in a standing mirror, and the vendor stands behind a sales counter.
+VenStore replaces the merchant window in World of Warcraft (Retail and WoW Forever) with a wooden shop interior. Items sit on shelves with hanging price cards. Cosmetics can be tried on in a standing mirror, and the vendor stands behind a sales counter.
 
 ## Features
 

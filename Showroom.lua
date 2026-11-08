@@ -1180,7 +1180,8 @@ end
 -- /venstore debug: prints the sizing numbers (window, vendor scale, each stage's lens and scale).
 function Showroom.DebugDump()
     local function size(f) return string.format("%.0fx%.0f", f:GetWidth() or 0, f:GetHeight() or 0) end
-    print("|cffffd100VenStore debug|r")
+    print(string.format("|cffffd100VenStore debug|r  client %s (interface %s)", addon.IS_FOREVER and "WoW Forever" or "Retail",
+        tostring(select(4, GetBuildInfo()))))
     print(string.format("  window %s scale %.2f | vendor frame %s | plinth region %s",
         size(ShelfFrame), ShelfFrame:GetScale() or 1, size(vendorModel), size(displayArea)))
     local onStage = vendorStage and vendorStage.scene:IsShown()

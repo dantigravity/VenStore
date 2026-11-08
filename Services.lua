@@ -10,12 +10,7 @@ addon.Services = Services
 
 local SIZE, GAP = 24, 6
 
-local function Coins(copper)
-    if C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString then
-        return C_CurrencyInfo.GetCoinTextureString(copper or 0)
-    end
-    return tostring(copper or 0)
-end
+local Coins = addon.CoinString
 
 local function SetUsable(b, usable)
     b:SetEnabled(usable)
@@ -152,7 +147,7 @@ end
 
 local events = CreateFrame("Frame")
 for _, e in ipairs({ "UPDATE_INVENTORY_DURABILITY", "PLAYER_MONEY", "BAG_UPDATE_DELAYED", "GUILDBANK_UPDATE_WITHDRAWMONEY" }) do
-    pcall(events.RegisterEvent, events, e)
+    addon.RegisterEventSafe(events, e)
 end
 events:SetScript("OnEvent", function()
     if ShelfFrame:IsShown() then Services:Update() end

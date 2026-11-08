@@ -286,8 +286,8 @@ function addon.UpdateWallet()
     end
 
     local parts = {}
-    if (usesGold or ShelfFrame.buyback or #currencies == 0) and C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString then
-        parts[#parts + 1] = C_CurrencyInfo.GetCoinTextureString(GetMoney() or 0, 11)
+    if usesGold or ShelfFrame.buyback or #currencies == 0 then
+        parts[#parts + 1] = addon.CoinString(GetMoney() or 0, 11)
     end
     for _, curr in ipairs(currencies) do
         local iconStr = curr.texture and string.format("|T%s:13:13:0:0|t ", tostring(curr.texture)) or ""

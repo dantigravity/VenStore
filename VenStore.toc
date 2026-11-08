@@ -1,4 +1,4 @@
-## Interface: 120105, 12107
+## Interface: 120105, 120107, 16001
 ## Title: VenStore
 ## Notes: Turns the merchant window into a 3D wooden shop: shelves, a try-on mirror, a display plinth and a sales counter with a shopping cart.
 ## Author: Dantigravity

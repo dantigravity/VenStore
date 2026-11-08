@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0
+
+### Added
+- WoW Forever support. The same folder now loads on both games (`## Interface: 120105, 120107, 16001`). Features the client doesn't have are left out instead of causing errors: for example, the plinth won't appear without mount, pet or housing data, and the spec filter is skipped without specializations.
+
+### Fixed
+- The TOC listed `12107` instead of `120107` for the 12.1.7 test realm.
+- Gold amounts fall back to the older coin-text function on clients without `C_CurrencyInfo.GetCoinTextureString`.
+- Events the client doesn't know about no longer stop the addon from loading.
+
 ## 1.0.0
 
 First release. VenStore replaces the merchant window with a 3D wooden shop.

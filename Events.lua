@@ -87,15 +87,10 @@ local function OnMerchantClosed()
 end
 
 local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("ADDON_LOADED")
-eventFrame:RegisterEvent("MERCHANT_SHOW")
-eventFrame:RegisterEvent("MERCHANT_UPDATE")
-eventFrame:RegisterEvent("MERCHANT_CLOSED")
-eventFrame:RegisterEvent("PLAYER_MONEY")
-eventFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
-eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
-eventFrame:RegisterEvent("DISPLAY_SIZE_CHANGED")
-eventFrame:RegisterEvent("UI_SCALE_CHANGED")
+for _, event in ipairs({ "ADDON_LOADED", "MERCHANT_SHOW", "MERCHANT_UPDATE", "MERCHANT_CLOSED",
+    "PLAYER_MONEY", "CURRENCY_DISPLAY_UPDATE", "BAG_UPDATE_DELAYED", "DISPLAY_SIZE_CHANGED", "UI_SCALE_CHANGED" }) do
+    addon.RegisterEventSafe(eventFrame, event)
+end
 
 eventFrame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" then

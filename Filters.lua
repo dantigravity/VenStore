@@ -9,6 +9,14 @@ local function Refresh()
     addon.Update()
 end
 
+-- Without the dropdown library the shop simply shows everything (no filter menus).
+if not (UIDropDownMenu_Initialize and UIDropDownMenu_SetText and UIDropDownMenu_CreateInfo) then
+    function addon.ResetFilters()
+        filters.currency, filters.type = "ALL", "ALL"
+    end
+    return
+end
+
 local currencyDropdown = CreateFrame("Frame", "VenStoreCurrencyFilterDD", topBeam, "UIDropDownMenuTemplate")
 currencyDropdown:SetPoint("LEFT", topBeam, "LEFT", -4, -4)
 UIDropDownMenu_SetWidth(currencyDropdown, 125)
@@ -114,6 +122,7 @@ UIDropDownMenu_Initialize(specDropdown, function(_, level)
     AddOption(level, ALL_CLASSES or "All Classes", current == LE_LOOT_FILTER_ALL, Select(LE_LOOT_FILTER_ALL))
     AddOption(level, UnitClass("player") or "Class", current == LE_LOOT_FILTER_CLASS, Select(LE_LOOT_FILTER_CLASS))
 
+    if not (GetSpecializationInfo and LE_LOOT_FILTER_SPEC1) then return end -- client without specs
     local sex = UnitSex("player")
     for s = 1, (GetNumSpecializations and GetNumSpecializations() or 0) do
         local _, specName, _, icon = GetSpecializationInfo(s, nil, nil, nil, sex)

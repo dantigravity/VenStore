@@ -195,7 +195,7 @@ local function UpdateDropGlow()
         b.glow:SetShown(show)
     end
 end
-cubby:RegisterEvent("CURSOR_CHANGED")
+addon.RegisterEventSafe(cubby, "CURSOR_CHANGED")
 cubby:SetScript("OnEvent", UpdateDropGlow)
 
 -- ============================================================================
@@ -391,9 +391,9 @@ local function SignTooltip(owner)
     end
     local copper, tokens = Cart:Totals()
     GameTooltip:AddLine(" ")
-    if copper > 0 and C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString then
+    if copper > 0 then
         local short = GetMoney() < copper and 0.25 or 1 -- red when you can't afford it
-        GameTooltip:AddDoubleLine("Total", C_CurrencyInfo.GetCoinTextureString(copper), 1, 0.82, 0, 1, short, short)
+        GameTooltip:AddDoubleLine("Total", addon.CoinString(copper), 1, 0.82, 0, 1, short, short)
     end
     for _, tk in ipairs(tokens) do
         local short = (tk.have and tk.have < tk.need) and 0.25 or 1

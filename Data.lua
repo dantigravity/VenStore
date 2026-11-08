@@ -49,6 +49,31 @@ function addon.SafeCall(func, ...)
 end
 
 -- ============================================================================
+-- CLIENT
+-- ============================================================================
+-- The same files run on Retail and on WoW Forever (WOW_PROJECT_CAMELOT). Features are detected
+-- by checking that the API exists, so this flag is only used for /venstore debug.
+addon.IS_FOREVER = WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT
+
+-- Register an event only if this client knows it (unknown event names raise an error).
+function addon.RegisterEventSafe(frame, event)
+    return (pcall(frame.RegisterEvent, frame, event))
+end
+
+-- Gold / silver / copper with coin icons.
+function addon.CoinString(copper, size)
+    copper = copper or 0
+    if C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString then
+        return C_CurrencyInfo.GetCoinTextureString(copper, size)
+    elseif GetCoinTextureString then
+        return GetCoinTextureString(copper, size)
+    elseif GetMoneyString then
+        return GetMoneyString(copper)
+    end
+    return tostring(copper)
+end
+
+-- ============================================================================
 -- CURRENCY / COST HELPERS
 -- ============================================================================
 local scanTip = CreateFrame("GameTooltip", "VenStoreCurrencyScanTip", nil, "GameTooltipTemplate")
@@ -140,9 +165,7 @@ end
 function addon.FormatVendorPrice(index, price, extendedCost)
     local valueParts, nameParts = {}, {}
     if price and price > 0 then
-        if C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString then
-            valueParts[#valueParts + 1] = C_CurrencyInfo.GetCoinTextureString(price, 10)
-        end
+        valueParts[#valueParts + 1] = addon.CoinString(price, 10)
         if not extendedCost then
             nameParts[#nameParts + 1] = price >= 10000 and "Gold" or (price >= 100 and "Silver" or "Copper")
         end
