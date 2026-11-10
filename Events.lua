@@ -47,6 +47,7 @@ local function OnMerchantShow()
     merchantOpen = true
     SuppressBlizzardMerchant(true)
 
+    SafeCall(addon.Theme.Refresh) -- zone theme (repaints only when it changes)
     ShelfFrame.page = 1
     ShelfFrame.buyback = false
     addon.ResetFilters()
@@ -131,6 +132,8 @@ SlashCmdList.VENSTORE = function(msg)
         addon.ApplyGrid(C.DEFAULT_COLS, C.DEFAULT_ROWS)
         if ShelfFrame:IsShown() then SafeCall(addon.Update) end
         print("|cffffd100VenStore:|r window size and position reset.")
+    elseif msg == "theme" or msg:match("^theme ") then
+        addon.Theme.Slash(msg:sub(7))
     elseif msg == "debug" then
         addon.Showroom.DebugDump()
     elseif msg == "vendor" then
@@ -141,5 +144,6 @@ SlashCmdList.VENSTORE = function(msg)
         print("  /venstore reset - restore the default window size and position")
         print("  /venstore debug - print the 3D sizing numbers (for bug reports)")
         print("  /venstore vendor - switch the vendor between the 3D stage and the plain model frame")
+        print("  /venstore theme [name | auto] - show the zone theme and map, or force a theme")
     end
 end

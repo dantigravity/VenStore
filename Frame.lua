@@ -98,7 +98,7 @@ local backboard = CreateFrame("Frame", nil, ShelfFrame)
 backboard:SetPoint("TOPLEFT", ShelfFrame, "TOPLEFT", 16, -C.HEADER_H)
 backboard:SetPoint("BOTTOMRIGHT", ShelfFrame, "BOTTOMRIGHT", -16, C.FOOTER_H)
 backboard:SetFrameLevel(baseLevel + 1)
-Wood.PlankWall(backboard, 24, 0.30, 0.18, 0.09, 10)
+Wood.PlankWall(backboard, 24, "wall", 10)
 addon.backboard = backboard
 
 -- Ambient occlusion and lantern light over the whole back wall.
@@ -123,7 +123,7 @@ local function MakePost(point, x, seed)
     post:SetPoint("BOTTOM" .. point, ShelfFrame, "BOTTOM" .. point, x, 8)
     post:SetWidth(16)
     post:SetFrameLevel(baseLevel + 8)
-    Wood.Paint(post, Wood.OAK[1], Wood.OAK[2], Wood.OAK[3], seed, { grain = "V", round = true })
+    Wood.Paint(post, "post", seed, { grain = "V", round = true })
     return post
 end
 MakePost("LEFT", 8, 11)
@@ -137,7 +137,7 @@ topBeam:SetPoint("TOPLEFT", ShelfFrame, "TOPLEFT", 10, -8)
 topBeam:SetPoint("TOPRIGHT", ShelfFrame, "TOPRIGHT", -10, -8)
 topBeam:SetHeight(48)
 topBeam:SetFrameLevel(baseLevel + 14)
-Wood.Paint(topBeam, Wood.HONEY[1] * 0.85, Wood.HONEY[2] * 0.85, Wood.HONEY[3] * 0.85, 99, { streaks = 14, knots = true, ends = true })
+Wood.Paint(topBeam, "beam", 99, { tone = 0.85, streaks = 14, knots = true, ends = true })
 addon.topBeam = topBeam
 
 -- Carved moulding along the bottom of the beam + its shadow on the backboard.
@@ -146,7 +146,7 @@ moulding:SetPoint("TOPLEFT", topBeam, "BOTTOMLEFT", 6, 6)
 moulding:SetPoint("TOPRIGHT", topBeam, "BOTTOMRIGHT", -6, 6)
 moulding:SetHeight(8)
 moulding:SetFrameLevel(topBeam:GetFrameLevel() + 1)
-Wood.Paint(moulding, Wood.WALNUT[1], Wood.WALNUT[2], Wood.WALNUT[3], 98, { streaks = 3, round = true, sheen = false })
+Wood.Paint(moulding, "trim", 98, { streaks = 3, round = true, sheen = false })
 local beamShadow = ShelfFrame:CreateTexture(nil, "ARTWORK")
 beamShadow:SetPoint("TOPLEFT", moulding, "BOTTOMLEFT")
 beamShadow:SetPoint("TOPRIGHT", moulding, "BOTTOMRIGHT")
@@ -180,7 +180,7 @@ walletBar:SetHeight(30)
 walletBar:SetPoint("BOTTOMLEFT", ShelfFrame, "BOTTOMLEFT", 18, 12)
 walletBar:SetPoint("BOTTOMRIGHT", ShelfFrame, "BOTTOMRIGHT", -32, 12)
 walletBar:SetFrameLevel(baseLevel + 14)
-Wood.Paint(walletBar, Wood.WALNUT[1], Wood.WALNUT[2], Wood.WALNUT[3], 88, { streaks = 8, ends = true })
+Wood.Paint(walletBar, "trim", 88, { streaks = 8, ends = true })
 addon.walletBar = walletBar
 
 local walletTopShadow = ShelfFrame:CreateTexture(nil, "ARTWORK")

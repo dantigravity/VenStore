@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0
+
+### Added
+- Zone themes, on by default. When you open a vendor in one of these regions, the shop is rebuilt from its capital's own materials, using the game's own textures:
+  - Stormwind (Stormwind City, Elwynn Forest, Westfall, Redridge Mountains, Duskwood): stone-block walls and a stone counter, with dark timber posts and shelves.
+  - Orgrimmar (Orgrimmar, Durotar, Northern Barrens): rough-cut timber, spiked iron and riveted stone.
+  - Silvermoon (Silvermoon City, Eversong Woods, Ghostlands, Isle of Quel'Danas): cream stucco walls, carved stone and gold filigree, gold columns, marble and red lacquer.
+  - Kul Tiras (Boralus, Tiragarde Sound, Drustvar, Stormsong Valley): nailed plank walls, carved timber, teal-painted metal and harbour stone.
+  
+  Everywhere else keeps the original workshop look. If your client lacks a texture, that surface stays wood.
+- `/venstore theme` shows the current theme, the map you're on, whether you're indoors and how many theme textures your client can load. `/venstore theme <name>` forces a theme; `/venstore theme auto` goes back to following the zone.
+
 ## 1.1.0
 
 ### Added

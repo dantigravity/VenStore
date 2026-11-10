@@ -21,7 +21,7 @@ for row = 1, C.MAX_ROWS do
     shelf.y = -SHELF_TOP_Y - (row - 1) * C.ROW_STRIDE
 
     -- Front face of the board.
-    Wood.Paint(shelf, Wood.HONEY[1], Wood.HONEY[2], Wood.HONEY[3], row * 10 + 2, { streaks = 7, ends = true })
+    Wood.Paint(shelf, "shelf", row * 10 + 2, { streaks = 7, ends = true })
     local border = CreateFrame("Frame", nil, shelf, "BackdropTemplate")
     border:SetAllPoints(shelf)
     border:SetFrameLevel(shelf:GetFrameLevel() + 1)
@@ -34,7 +34,7 @@ for row = 1, C.MAX_ROWS do
     deck:SetPoint("BOTTOMRIGHT", shelf, "TOPRIGHT", -2, -2)
     deck:SetHeight(15)
     deck:SetFrameLevel(baseLevel + 5)
-    Wood.Paint(deck, Wood.OAK[1], Wood.OAK[2], Wood.OAK[3], row * 10 + 1,
+    Wood.Paint(deck, "deck", row * 10 + 1,
         { streaks = 6, flip = true, light = 1.35, dark = 0.62, bevel = false, sheen = false })
     Wood.EdgeShade(deck, deck, "TOP", 7, 0.80, "ARTWORK", 2)
 
@@ -51,9 +51,10 @@ for row = 1, C.MAX_ROWS do
         bracket:SetSize(10, 20)
         bracket:SetPoint("TOP" .. side, shelf, "BOTTOM" .. side, side == "LEFT" and 6 or -6, 2)
         bracket:SetFrameLevel(baseLevel + 5)
-        Wood.Paint(bracket, Wood.WALNUT[1] * 1.2, Wood.WALNUT[2] * 1.2, Wood.WALNUT[3] * 1.2, row * 10 + (side == "LEFT" and 5 or 6),
-            { grain = "V", round = true, streaks = 2 })
-        local tip = Wood.Disc(bracket, "ARTWORK", 2, Wood.Shade(Wood.WALNUT[1], Wood.WALNUT[2], Wood.WALNUT[3], 1.1))
+        Wood.Paint(bracket, "trim", row * 10 + (side == "LEFT" and 5 or 6),
+            { tone = 1.2, grain = "V", round = true, streaks = 2 })
+        local tip = Wood.Disc(bracket, "ARTWORK", 2, 1, 1, 1, 1)
+        Wood.Tint("trim", 1.1, function(r, g, b) tip:SetVertexColor(r, g, b, 1) end)
         tip:SetSize(10, 6)
         tip:SetPoint("CENTER", bracket, "BOTTOM", 0, 0)
     end

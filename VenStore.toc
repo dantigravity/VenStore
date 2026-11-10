@@ -2,12 +2,13 @@
 ## Title: VenStore
 ## Notes: Turns the merchant window into a 3D wooden shop: shelves, a try-on mirror, a display plinth and a sales counter with a shopping cart.
 ## Author: Dantigravity
-## Version: v1.0.0
+## Version: v1.2.0
 ## SavedVariables: VenStoreDB
 ## IconTexture: Interface\Icons\INV_Misc_Bag_10
 ## Category-enUS: Inventory
 
 Data.lua
+Theme.lua
 Wood.lua
 Frame.lua
 Showroom.lua

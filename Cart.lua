@@ -29,14 +29,14 @@ local cubby = CreateFrame("Frame", nil, body)
 cubby:SetPoint("TOPLEFT", body, "TOPLEFT", 7, -28)
 cubby:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -7, 6)
 cubby:SetFrameLevel(body:GetFrameLevel() + 1)
-Wood.Paint(cubby, Wood.OAK[1], Wood.OAK[2], Wood.OAK[3], 150, { grain = "V" })
+Wood.Paint(cubby, "counterTrim", 150, { grain = "V" })
 
 local recess = CreateFrame("Frame", nil, cubby)
 recess:SetPoint("TOPLEFT", 5, -5)
 recess:SetPoint("BOTTOMRIGHT", -5, 5)
 recess:SetFrameLevel(cubby:GetFrameLevel() + 1)
-Wood.Paint(recess, Wood.WALNUT[1] * 0.55, Wood.WALNUT[2] * 0.55, Wood.WALNUT[3] * 0.55, 151,
-    { grain = "V", sheen = false, bevel = false })
+Wood.Paint(recess, "counter", 151,
+    { tone = 0.55, grain = "V", sheen = false, bevel = false })
 local recessDark = recess:CreateTexture(nil, "BORDER", nil, 0)
 recessDark:SetAllPoints()
 Wood.Gradient(recessDark, "VERTICAL", 0, 0, 0, 0.15, 0, 0, 0, 0.55) -- the counter top shades the back wall
@@ -56,7 +56,7 @@ for tier = 1, 2 do
     local board = CreateFrame("Frame", nil, recess)
     board:SetHeight(BOARD_H)
     board:SetFrameLevel(recess:GetFrameLevel() + 2)
-    Wood.Paint(board, Wood.HONEY[1], Wood.HONEY[2], Wood.HONEY[3], 152 + tier, { round = true, ends = true, flip = true })
+    Wood.Paint(board, "shelf", 152 + tier, { round = true, ends = true, flip = true })
     local under = Wood.Solid(recess, "ARTWORK", 0, 0, 0, 0, 1)
     under:SetPoint("TOPLEFT", board, "BOTTOMLEFT"); under:SetPoint("TOPRIGHT", board, "BOTTOMRIGHT"); under:SetHeight(9)
     Wood.Gradient(under, "VERTICAL", 0, 0, 0, 0, 0, 0, 0, 0.65)

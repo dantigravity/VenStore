@@ -3,6 +3,8 @@
 -- pores). Every surface samples its own slice of it (offset, mirrored, rotated for posts) and is
 -- tinted per wood type. Lighting is layered on in code: light from above, varnish sheen, chamfered
 -- bevels, rounded posts, butt joints with nails and ambient-occlusion shadows where surfaces meet.
+-- Zone themes (Theme.lua) can swap any surface for one of Blizzard's own city textures instead
+-- (see MATERIALS below).
 local _, addon = ...
 
 local Wood = {}
@@ -17,11 +19,7 @@ local TEXELS_PER_PIXEL = 1.5              -- grain scale on screen
 Wood.DISC = DISC
 Wood.PLANK = PLANK
 
--- Shared palette (r, g, b): the average colour each surface should end up with.
-Wood.OAK = { 0.40, 0.25, 0.13 }
-Wood.HONEY = { 0.52, 0.33, 0.17 }
-Wood.WALNUT = { 0.27, 0.16, 0.08 }
-Wood.EBONY = { 0.17, 0.10, 0.05 }
+-- Surface colours come from the theme (Theme.lua), by role: "wall", "post", "shelf", "counter"...
 
 local function Clamp(v)
     if v < 0 then return 0 elseif v > 1 then return 1 end
@@ -32,6 +30,40 @@ local function Shade(r, g, b, m)
     return Clamp(r * m), Clamp(g * m), Clamp(b * m)
 end
 Wood.Shade = Shade
+
+-- ============================================================================
+-- THEME HOOKS
+-- ============================================================================
+-- Wood.Tint(role, tone, fn): fn(r, g, b, theme) runs now with the role's colour times `tone`
+-- (a number, or { r, g, b } multipliers), and again on every theme change. Every colour that
+-- depends on the theme goes through here, so the shop repaints in place without rebuilding.
+local hooks = {}
+
+local function RunHook(h, theme)
+    local c = addon.Theme.Colour(theme, h.role)
+    local t = h.tone or 1
+    local tr, tg, tb
+    if type(t) == "table" then tr, tg, tb = t[1], t[2], t[3] else tr, tg, tb = t, t, t end
+    h.fn(Clamp(c[1] * tr), Clamp(c[2] * tg), Clamp(c[3] * tb), theme)
+end
+
+function Wood.Tint(role, tone, fn)
+    local h = { role = role, tone = tone, fn = fn }
+    hooks[#hooks + 1] = h
+    RunHook(h, addon.Theme.current)
+    return h
+end
+
+function Wood.ApplyTheme(theme)
+    for i = 1, #hooks do RunHook(hooks[i], theme) end
+end
+
+-- Current colour of a role (for one-off reads; anything that must follow the theme uses Tint).
+function Wood.RoleColour(role, tone)
+    local c = addon.Theme.Colour(addon.Theme.current, role)
+    tone = tone or 1
+    return Clamp(c[1] * tone), Clamp(c[2] * tone), Clamp(c[3] * tone)
+end
 
 -- Deterministic PRNG so every surface keeps the same grain between sessions.
 local function NewRNG(seed)
@@ -103,13 +135,15 @@ end
 -- ============================================================================
 -- GRAIN TEXTURE
 -- ============================================================================
--- Turns `tex` into a slice of the plank texture tinted to average (r, g, b).
--- Returns a function(width, height) that re-maps the slice so the grain keeps a constant
--- on-screen scale whatever size the surface is.
-function Wood.ApplyGrain(tex, r, g, b, seed, vertical)
-    local rand = NewRNG(seed)
-    tex:SetTexture(PLANK, "REPEAT", "REPEAT")
+-- Tints the plank texture so it averages (r, g, b).
+local function TintGrain(tex, r, g, b)
     tex:SetVertexColor(Clamp(r / PLANK_AVG[1]), Clamp(g / PLANK_AVG[2]), Clamp(b / PLANK_AVG[3]))
+end
+
+-- Returns a function(width, height) that maps `tex` (showing the plank texture) to its own slice
+-- of the grain, at a constant on-screen scale whatever size the surface is.
+local function GrainMap(tex, seed, vertical)
+    local rand = NewRNG(seed)
     local u0, vPick, mirrored = rand(), rand(), rand() < 0.5
     local function Map(w, h)
         if not w or not h or w <= 0 or h <= 0 then return end
@@ -131,7 +165,125 @@ function Wood.ApplyGrain(tex, r, g, b, seed, vertical)
 end
 
 -- ============================================================================
--- Wood.Paint(frame, r, g, b, seed, opts)
+-- MATERIALS: Blizzard's own world textures, by file ID (see Theme.lua)
+-- ============================================================================
+-- A theme can give a role a material instead of plank grain:
+--   { file = id, size = px }               tile the whole texture, `size` px per repeat
+--   { file = id, band = { a0, a1 }, axis = "u" | "v" }
+--       one strip of an atlas texture, stretched across the surface and repeated along it.
+--       axis "u": a horizontal strip (rows a0..a1); "v": a vertical strip (columns a0..a1).
+--       Strips are turned 90 degrees to fit surfaces that run the other way.
+--   tint = { r, g, b }   multiplies the texture (default white)
+--   boost = 0..1         adds a brightening copy: world textures are made to be lit in 3D and
+--                        look dark when drawn flat on the UI
+--   sheen = number       varnish highlight strength (default 0: stone and metal don't get one)
+
+-- Does this client have the texture? (A missing file ID makes SetTexture return false.)
+local loadable = {}
+function Wood.CanLoad(file)
+    if loadable[file] == nil then
+        local probe = UIParent:CreateTexture(nil, "BACKGROUND")
+        local ok = probe:SetTexture(file)
+        loadable[file] = ok ~= false
+        probe:SetTexture(nil)
+        probe:Hide()
+    end
+    return loadable[file]
+end
+
+-- Texture coordinates for material `mat` on a w x h surface. `vertical` = the surface runs up
+-- and down (posts). o1 / o2 shift where the repeat starts, so neighbouring surfaces differ.
+local function MapMaterial(tex, mat, w, h, vertical, o1, o2)
+    if not mat.band then
+        local s = mat.size or 256
+        tex:SetTexCoord(o1, o1 + w / s, o2, o2 + h / s)
+        return
+    end
+    local a0, a1 = mat.band[1], mat.band[2]
+    local along, across = vertical and h or w, vertical and w or h
+    local scale = across / (a1 - a0)       -- screen px per texture unit
+    local s0, s1 = o1, o1 + along / scale  -- span along the strip (repeats)
+    local stripRunsU = (mat.axis or "u") == "u"
+    if stripRunsU and not vertical then
+        tex:SetTexCoord(s0, s1, a0, a1)
+    elseif not stripRunsU and vertical then
+        tex:SetTexCoord(a0, a1, s0, s1)
+    elseif stripRunsU then
+        -- horizontal strip on an upright surface: texture u runs down the screen, v across it
+        tex:SetTexCoord(s0, a0, s1, a0, s0, a1, s1, a1)
+    else
+        -- vertical strip on a lying surface: texture v runs across the screen, u down it
+        tex:SetTexCoord(a0, s0, a1, s0, a0, s1, a1, s1)
+    end
+end
+
+-- A texture that shows either plank grain (in the role's colour) or the theme's material for the
+-- role, and follows theme changes. Returns the skin: skin.Map(w, h) re-maps it to a new size;
+-- skin.mat is the material in use (nil = wood). woodOnly ignores materials.
+local function Skin(tex, role, seed, vertical, tone, mask, woodOnly)
+    local grainMap = GrainMap(tex, seed, vertical)
+    local rand = NewRNG((seed or 1) + 7777)
+    local o1, o2 = rand(), rand()
+    local skin = {}
+    local boost
+
+    function skin.Map(w, h)
+        if w and h and w > 0 and h > 0 then skin.w, skin.h = w, h end
+        if not skin.w then return end
+        if skin.mat then
+            MapMaterial(tex, skin.mat, skin.w, skin.h, vertical, o1, o2)
+            if boost then MapMaterial(boost, skin.mat, skin.w, skin.h, vertical, o1, o2) end
+        else
+            grainMap(skin.w, skin.h)
+        end
+    end
+
+    Wood.Tint(role, tone, function(r, g, b, theme)
+        local mat = not woodOnly and theme and theme.materials and theme.materials[role] or nil
+        if mat and not Wood.CanLoad(mat.file) then mat = nil end
+        skin.mat = mat
+        if mat then
+            tex:SetTexture(mat.file, "REPEAT", "REPEAT")
+            -- A tone below 1 (the dark cubby recess, the floor deck) darkens the material too.
+            local k = type(tone) == "number" and math.min(tone, 1) or 1
+            local t = mat.tint
+            local mr, mg, mb = (t and t[1] or 1) * k, (t and t[2] or 1) * k, (t and t[3] or 1) * k
+            tex:SetVertexColor(mr, mg, mb)
+            if mat.boost and mat.boost > 0 then
+                if not boost then
+                    local layer, sub = tex:GetDrawLayer()
+                    boost = tex:GetParent():CreateTexture(nil, layer, nil, sub)
+                    boost:SetAllPoints(tex)
+                    boost:SetBlendMode("ADD")
+                    if mask then boost:AddMaskTexture(mask) end
+                end
+                boost:SetTexture(mat.file, "REPEAT", "REPEAT")
+                boost:SetVertexColor(mr, mg, mb, mat.boost)
+                boost:Show()
+            elseif boost then
+                boost:Hide()
+            end
+        else
+            tex:SetTexture(PLANK, "REPEAT", "REPEAT")
+            TintGrain(tex, r, g, b)
+            if boost then boost:Hide() end
+        end
+        skin.Map()
+    end)
+    return skin
+end
+Wood.Skin = Skin
+
+-- Grain (or the theme's material) on a bare texture, for `role` times `tone`. `mask` is applied to
+-- any extra layers too. Returns the re-map function(width, height).
+function Wood.ApplyGrain(tex, role, seed, vertical, tone, mask)
+    return Skin(tex, role, seed, vertical, tone, mask).Map
+end
+
+-- ============================================================================
+-- Wood.Paint(frame, role, seed, opts) - a board in the colour of `role` (see Theme.lua)
+--   opts.tone    multiplier on the role colour: a number or { r, g, b }
+--   opts.woodOnly   always plank grain, even when the theme gives the role a material
 --   opts.grain   "H" (default) or "V" - direction the grain runs
 --   opts.bevel   chamfered edge highlights/shadows (default true)
 --   opts.round   cylindrical shading across the short axis (posts, rails)
@@ -141,20 +293,20 @@ end
 --   opts.light   highlight strength at the lit edge (default 1.14)
 --   opts.dark    brightness at the shaded edge (default 0.78)
 -- ============================================================================
-function Wood.Paint(frame, r, g, b, seed, opts)
+function Wood.Paint(frame, role, seed, opts)
     opts = opts or {}
     local vertical = opts.grain == "V"
 
     -- 0. Flat colour underneath (what you would see if the texture failed to load).
-    local under = Wood.Solid(frame, "BACKGROUND", 0, r, g, b, 1)
+    local under = frame:CreateTexture(nil, "BACKGROUND", nil, 0)
     under:SetAllPoints()
 
-    -- 1. Grain.
+    -- 1. Grain (or the theme's material).
     local grain = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
     grain:SetAllPoints()
-    local map = Wood.ApplyGrain(grain, r, g, b, seed, vertical)
-    frame:HookScript("OnSizeChanged", function(self, w, h) map(w, h) end)
-    map(frame:GetWidth(), frame:GetHeight())
+    local skin = Skin(grain, role, seed, vertical, opts.tone, nil, opts.woodOnly)
+    frame:HookScript("OnSizeChanged", function(self, w, h) skin.Map(w, h) end)
+    skin.Map(frame:GetWidth(), frame:GetHeight())
 
     -- 2. Light from above (or from the left on posts): a shade toward the far edge plus a warm lift
     --    on the lit edge.
@@ -176,14 +328,15 @@ function Wood.Paint(frame, r, g, b, seed, opts)
         Gradient(lift, "VERTICAL", 1, 0.8, 0.55, 0, 1, 0.8, 0.55, liftA)
     end
 
-    -- 3. Varnish sheen: a soft specular band in the upper third of the board.
+    -- 3. Varnish sheen: a soft specular band in the upper third of the board. Its strength is the
+    --    theme's varnish.
+    local sheen
     if opts.sheen ~= false and not vertical then
-        local sheen = frame:CreateTexture(nil, "BACKGROUND", nil, 6)
+        sheen = frame:CreateTexture(nil, "BACKGROUND", nil, 6)
         sheen:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -2)
         sheen:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, -2)
         sheen:SetHeight(math.max(3, (frame:GetHeight() or 12) * 0.35))
         sheen:SetBlendMode("ADD")
-        Gradient(sheen, "VERTICAL", 1, 0.9, 0.7, 0, 1, 0.9, 0.7, 0.07)
     end
 
     -- 4. Cylindrical shading for posts / rails.
@@ -203,37 +356,70 @@ function Wood.Paint(frame, r, g, b, seed, opts)
     end
 
     -- 6. Chamfered edges: bright top lip, dark underside.
+    local hi, hi2, lo
     if opts.bevel ~= false then
-        local hr, hg, hb = Shade(r, g, b, 1.75)
-        local sr, sg, sb = Shade(r, g, b, 0.28)
+        hi = frame:CreateTexture(nil, "ARTWORK", nil, 1)
+        lo = frame:CreateTexture(nil, "ARTWORK", nil, 1)
         if vertical then
-            local hi = Wood.Solid(frame, "ARTWORK", 1, hr, hg, hb, 0.45)
             hi:SetPoint("TOPLEFT"); hi:SetPoint("BOTTOMLEFT"); hi:SetWidth(1)
-            local lo = Wood.Solid(frame, "ARTWORK", 1, sr, sg, sb, 0.85)
             lo:SetPoint("TOPRIGHT"); lo:SetPoint("BOTTOMRIGHT"); lo:SetWidth(2)
         else
-            local hi = Wood.Solid(frame, "ARTWORK", 1, hr, hg, hb, 0.55)
             hi:SetPoint("TOPLEFT"); hi:SetPoint("TOPRIGHT"); hi:SetHeight(1)
-            local hi2 = frame:CreateTexture(nil, "ARTWORK", nil, 1)
+            hi2 = frame:CreateTexture(nil, "ARTWORK", nil, 1)
             hi2:SetPoint("TOPLEFT", hi, "BOTTOMLEFT"); hi2:SetPoint("TOPRIGHT", hi, "BOTTOMRIGHT"); hi2:SetHeight(3)
-            local mr, mg, mb = Shade(r, g, b, 1.3)
-            Gradient(hi2, "VERTICAL", mr, mg, mb, 0, mr, mg, mb, 0.30)
-            local lo = Wood.Solid(frame, "ARTWORK", 1, sr, sg, sb, 0.85)
             lo:SetPoint("BOTTOMLEFT"); lo:SetPoint("BOTTOMRIGHT"); lo:SetHeight(2)
         end
     end
+
+    -- Everything that depends on the colour, re-run on each theme change.
+    -- (The skin above re-textures the grain layer itself; it was registered first, so skin.mat is
+    -- already current here.)
+    return Wood.Tint(role, opts.tone, function(r, g, b, theme)
+        under:SetColorTexture(r, g, b, 1)
+        if sheen then
+            local a = 0.07 * (skin.mat and (skin.mat.sheen or 0) or (theme and theme.varnish or 1))
+            Gradient(sheen, "VERTICAL", 1, 0.9, 0.7, 0, 1, 0.9, 0.7, a)
+        end
+        if hi then
+            local hr, hg, hb = Shade(r, g, b, 1.75)
+            local sr, sg, sb = Shade(r, g, b, 0.28)
+            hi:SetColorTexture(hr, hg, hb, vertical and 0.45 or 0.55)
+            lo:SetColorTexture(sr, sg, sb, 0.85)
+            if hi2 then
+                local mr, mg, mb = Shade(r, g, b, 1.3)
+                Gradient(hi2, "VERTICAL", mr, mg, mb, 0, mr, mg, mb, 0.30)
+            end
+        end
+    end)
 end
 
 -- ============================================================================
--- Fixed-height horizontal plank wall (planks never stretch; extra height is clipped).
+-- Fixed-height horizontal plank wall in the colour of `role` (planks never stretch; extra height
+-- is clipped). When the theme gives the role a material, one continuous layer of it replaces
+-- the planks.
 -- ============================================================================
-function Wood.PlankWall(parent, numPlanks, r, g, b, seed)
+function Wood.PlankWall(parent, numPlanks, role, seed)
     if parent.SetClipsChildren then parent:SetClipsChildren(true) end
     local plankH = addon.C.PLANK_H
     local rand = NewRNG(seed)
 
+    local planks = CreateFrame("Frame", nil, parent)
+    planks:SetAllPoints()
+    planks:SetFrameLevel(parent:GetFrameLevel())
+
+    local surface = parent:CreateTexture(nil, "BACKGROUND", nil, 0)
+    surface:SetAllPoints()
+    local wallSkin = Skin(surface, role, seed)
+    parent:HookScript("OnSizeChanged", function(self, w, h) wallSkin.Map(w, h) end)
+    wallSkin.Map(parent:GetWidth(), parent:GetHeight())
+    Wood.Tint(role, 1, function()
+        local stone = wallSkin.mat ~= nil
+        surface:SetShown(stone)
+        planks:SetShown(not stone)
+    end)
+
     for i = 1, numPlanks do
-        local plank = CreateFrame("Frame", nil, parent)
+        local plank = CreateFrame("Frame", nil, planks)
         plank:SetHeight(plankH)
         plank:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -((i - 1) * plankH))
         plank:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -((i - 1) * plankH))
@@ -241,8 +427,8 @@ function Wood.PlankWall(parent, numPlanks, r, g, b, seed)
 
         -- Each board gets its own tone and a hint of hue drift, like boards cut from different logs.
         local m = rand(0.84, 1.10)
-        local pr, pg, pb = Clamp(r * m), Clamp(g * m * rand(0.95, 1.04)), Clamp(b * m * rand(0.90, 1.08))
-        Wood.Paint(plank, pr, pg, pb, seed * 31 + i, { light = 1.10, dark = 0.74 })
+        local tone = { m, m * rand(0.95, 1.04), m * rand(0.90, 1.08) }
+        Wood.Paint(plank, role, seed * 31 + i, { tone = tone, light = 1.10, dark = 0.74, woodOnly = true })
 
         -- Groove between boards.
         local groove = Wood.Solid(plank, "OVERLAY", 1, 0.04, 0.02, 0.01, 0.95)
@@ -253,16 +439,18 @@ function Wood.PlankWall(parent, numPlanks, r, g, b, seed)
         Gradient(grooveShadow, "VERTICAL", 0, 0, 0, 0.35, 0, 0, 0, 0)
 
         -- Staggered butt joints, each with two nail heads.
+        local lips = {}
         local x = rand(40, 260)
         while x < 1450 do
             local seam = Wood.Solid(plank, "OVERLAY", 2, 0.05, 0.02, 0.01, 0.92)
             seam:SetWidth(2)
             seam:SetPoint("TOPLEFT", plank, "TOPLEFT", x, 0)
             seam:SetPoint("BOTTOMLEFT", plank, "BOTTOMLEFT", x, 2)
-            local lip = Wood.Solid(plank, "OVERLAY", 2, Shade(pr, pg, pb, 1.7))
+            local lip = plank:CreateTexture(nil, "OVERLAY", nil, 2)
             lip:SetAlpha(0.45)
             lip:SetWidth(1)
             lip:SetPoint("TOPLEFT", seam, "TOPRIGHT"); lip:SetPoint("BOTTOMLEFT", seam, "BOTTOMRIGHT")
+            lips[#lips + 1] = lip
             local endShade = plank:CreateTexture(nil, "OVERLAY", nil, 1)
             endShade:SetWidth(8)
             endShade:SetPoint("TOPRIGHT", seam, "TOPLEFT"); endShade:SetPoint("BOTTOMRIGHT", seam, "BOTTOMLEFT")
@@ -278,6 +466,10 @@ function Wood.PlankWall(parent, numPlanks, r, g, b, seed)
             end
             x = x + rand(260, 560)
         end
+        Wood.Tint(role, tone, function(r, g, b)
+            local lr, lg, lb = Shade(r, g, b, 1.7)
+            for _, lip in ipairs(lips) do lip:SetColorTexture(lr, lg, lb, 1) end
+        end)
     end
 end
 
