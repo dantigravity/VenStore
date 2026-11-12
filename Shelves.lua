@@ -45,18 +45,25 @@ for row = 1, C.MAX_ROWS do
     underShadow:SetHeight(26)
     Wood.Gradient(underShadow, "VERTICAL", 0, 0, 0, 0, 0, 0, 0, 0.70)
 
-    -- Carved support brackets under each end.
+    -- Support brackets under each end: turned posts with a round tip, or carved corbels when the
+    -- theme gives brackets their own material.
     for _, side in ipairs({ "LEFT", "RIGHT" }) do
         local bracket = CreateFrame("Frame", nil, shelf)
         bracket:SetSize(10, 20)
         bracket:SetPoint("TOP" .. side, shelf, "BOTTOM" .. side, side == "LEFT" and 6 or -6, 2)
         bracket:SetFrameLevel(baseLevel + 5)
-        Wood.Paint(bracket, "trim", row * 10 + (side == "LEFT" and 5 or 6),
+        Wood.Paint(bracket, "bracket", row * 10 + (side == "LEFT" and 5 or 6),
             { tone = 1.2, grain = "V", round = true, streaks = 2 })
         local tip = Wood.Disc(bracket, "ARTWORK", 2, 1, 1, 1, 1)
-        Wood.Tint("trim", 1.1, function(r, g, b) tip:SetVertexColor(r, g, b, 1) end)
         tip:SetSize(10, 6)
         tip:SetPoint("CENTER", bracket, "BOTTOM", 0, 0)
+        Wood.Tint("bracket", 1.1, function(r, g, b, theme)
+            tip:SetVertexColor(r, g, b, 1)
+            local carved = theme and theme.materials and theme.materials.bracket
+            carved = carved and Wood.CanLoad(carved.file)
+            bracket:SetSize(carved and 16 or 10, carved and 26 or 20)
+            tip:SetShown(not carved)
+        end)
     end
 
     ShelfFrame.shelves[row] = shelf
@@ -118,6 +125,8 @@ local function OnSlotClick(self, button)
         addon.Showroom:Preview(index)
     elseif IsAltKeyDown() then
         addon.Cart:Add(index)
+    elseif IsShiftKeyDown() and not (ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()) then
+        addon.Cart:PickQuantity(self, index) -- choose how many to put on the counter
     elseif IsModifiedClick() then
         HandleModifiedItemClick(GetMerchantItemLink(index))
     elseif button == "RightButton" then

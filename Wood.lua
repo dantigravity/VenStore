@@ -173,9 +173,13 @@ end
 --       one strip of an atlas texture, stretched across the surface and repeated along it.
 --       axis "u": a horizontal strip (rows a0..a1); "v": a vertical strip (columns a0..a1).
 --       Strips are turned 90 degrees to fit surfaces that run the other way.
+--   { file = id, rect = { u0, u1, v0, v1 } }   one part of the texture stretched over the surface
 --   tint = { r, g, b }   multiplies the texture (default white)
 --   boost = 0..1         adds a brightening copy: world textures are made to be lit in 3D and
 --                        look dark when drawn flat on the UI
+-- Materials are drawn opaque: many world textures keep a gloss or glow mask in their alpha, which
+-- the UI would otherwise draw as see-through. (Masked surfaces keep alpha blending, so the mask
+-- works; give them materials without an alpha channel.)
 --   sheen = number       varnish highlight strength (default 0: stone and metal don't get one)
 
 -- Does this client have the texture? (A missing file ID makes SetTexture return false.)
@@ -194,6 +198,11 @@ end
 -- Texture coordinates for material `mat` on a w x h surface. `vertical` = the surface runs up
 -- and down (posts). o1 / o2 shift where the repeat starts, so neighbouring surfaces differ.
 local function MapMaterial(tex, mat, w, h, vertical, o1, o2)
+    if mat.rect then
+        local r = mat.rect
+        tex:SetTexCoord(r[1], r[2], r[3], r[4])
+        return
+    end
     if not mat.band then
         local s = mat.size or 256
         tex:SetTexCoord(o1, o1 + w / s, o2, o2 + h / s)
@@ -216,6 +225,7 @@ local function MapMaterial(tex, mat, w, h, vertical, o1, o2)
         tex:SetTexCoord(a0, s0, a1, s0, a0, s1, a1, s1)
     end
 end
+Wood.MapMaterial = MapMaterial
 
 -- A texture that shows either plank grain (in the role's colour) or the theme's material for the
 -- role, and follows theme changes. Returns the skin: skin.Map(w, h) re-maps it to a new size;
@@ -239,11 +249,12 @@ local function Skin(tex, role, seed, vertical, tone, mask, woodOnly)
     end
 
     Wood.Tint(role, tone, function(r, g, b, theme)
-        local mat = not woodOnly and theme and theme.materials and theme.materials[role] or nil
+        local mat = not woodOnly and addon.Theme.Material(theme, role) or nil
         if mat and not Wood.CanLoad(mat.file) then mat = nil end
         skin.mat = mat
         if mat then
             tex:SetTexture(mat.file, "REPEAT", "REPEAT")
+            tex:SetBlendMode(mask and "BLEND" or "DISABLE")
             -- A tone below 1 (the dark cubby recess, the floor deck) darkens the material too.
             local k = type(tone) == "number" and math.min(tone, 1) or 1
             local t = mat.tint
@@ -265,6 +276,7 @@ local function Skin(tex, role, seed, vertical, tone, mask, woodOnly)
             end
         else
             tex:SetTexture(PLANK, "REPEAT", "REPEAT")
+            tex:SetBlendMode("BLEND")
             TintGrain(tex, r, g, b)
             if boost then boost:Hide() end
         end

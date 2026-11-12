@@ -115,6 +115,7 @@ lanternGlow:SetPoint("TOPRIGHT", 0, -10)
 lanternGlow:SetHeight(220)
 lanternGlow:SetBlendMode("ADD")
 Wood.Gradient(lanternGlow, "VERTICAL", 1, 0.62, 0.25, 0, 1, 0.62, 0.25, 0.07)
+addon.backboardLight, addon.lanternGlow = backboardLight, lanternGlow
 
 -- Heavy side posts.
 local function MakePost(point, x, seed)
@@ -126,8 +127,7 @@ local function MakePost(point, x, seed)
     Wood.Paint(post, "post", seed, { grain = "V", round = true })
     return post
 end
-MakePost("LEFT", 8, 11)
-MakePost("RIGHT", -8, 12)
+addon.cornerPosts = { MakePost("LEFT", 8, 11), MakePost("RIGHT", -8, 12) }
 
 -- ============================================================================
 -- HEADER BEAM, TITLE, CLOSE

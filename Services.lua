@@ -22,6 +22,7 @@ local bar = CreateFrame("Frame", nil, addon.topBeam)
 bar:SetSize(SIZE, SIZE)
 bar:SetPoint("RIGHT", addon.topBeam, "RIGHT", -36, -4)
 bar:SetFrameLevel(addon.topBeam:GetFrameLevel() + 6)
+Services.bar = bar
 
 -- ---------------------------------------------------------------- buttons (right to left)
 local buyback = Wood.IconButton(bar, SIZE, "INV_Misc_Note_02", BUYBACK or "Buyback",

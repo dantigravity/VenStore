@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.3.0
+
+### Added
+- **Settings menu.** Click the gear on the header beam, or type `/venstore`, to open it. It opens to the right of the shop, can be dragged anywhere, and remembers where you put it. It holds:
+  - the shop theme (Auto or any theme)
+  - time-of-day lighting and the outdoor breeze (On / Off)
+  - the setting (Auto, Indoors, Town or Wilds) and the time of day (follow the realm clock, or set an hour)
+  - a button that resets the window size
+- **Darnassus theme** for Teldrassil, Darnassus, Darkshore, Ashenvale, Moonglade, Mount Hyjal, Val'sharah, Amirdrassil and Bel'ameth: the living wood of Darnassus, built from the game's own druid textures.
+- **Time of day.** The shop's lighting follows the realm clock from dawn to night. Each theme has a window in its own style behind the vendor, showing the sky outside, and square windows glow at night.
+- **Indoors and outdoors.** The shop works out where you are:
+  - Indoors, it is the shop as before.
+  - In a town, the walls stay and the light is the open-air light.
+  - Out in the wilds, the shop becomes a market stall: a canvas awning, square corner posts with knee braces, and the region's own landscape behind it.
+- **3D wilderness.** The landscape behind the stall is built from the zone's real tree, bush and fence models, standing on ground that runs back to the horizon at the vendor's eye level:
+  - Elwynn, for Stormwind, the Workshop and Kul Tiras
+  - Ashenvale, for Darnassus
+  - Eversong, for Silvermoon
+  - the Barrens, for Orgrimmar
+  
+  A fence runs right behind the vendor. On clients without these models, the landscape is drawn as painted scenery instead.
+- **Lights and sound.** Wall torches light up at dusk. Outdoors, a lantern on the counter flickers in the wind, and an optional breeze plays.
+- **Choose a quantity.** Shift-click an item on the shelves, or an item in the cart, to type how many you want. Shift + mouse wheel on a cart item changes the amount by 10. The cart now takes up to 999 of an item (limited by the vendor's stock and your gold), and the bag-space check counts stacks.
+- `/venstore forest` lists what the 3D wilderness loaded and where it put it (for bug reports). `/venstore ambience` previews a setting or hour, or turns the lighting off.
+
+### Changed
+- The vendor is about 1.4× larger and stands lower behind the counter, so they look like they stand on the floor.
+- Stormwind uses larger, greyer stone blocks, and its shelves now rest on carved corbels like the city's own furniture.
+- The coins and ledger on the counter are redrawn: stacked gold coins with milled edges and a leather ledger with brass corners and a ribbon.
+- The quill's highlight shows only while you hover over it, not during the signing animation.
+
+### Removed
+- The plain vendor model option is no longer in the menu. `/venstore vendor` still switches it.
+
 ## 1.2.0
 
 ### Added

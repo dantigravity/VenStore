@@ -20,6 +20,8 @@ local C = {
     DISPLAY_W = 190,      -- Display plinth for 3D previews (only when the vendor sells displayable items)
     STAGE_GAP = 10,       -- Spacing between the stage and the bay/shelves to its left
     COUNTER_RATIO = 0.47, -- Counter height as a share of the stage height (hides the vendor's legs)
+    VENDOR_SINK = 0.40,   -- The vendor stands this share of the stage height below the floor, so they
+                          -- are drawn larger behind the counter (head still at the top)
     STAGE_H = 420,        -- Fixed height of the vendor / plinth scenes (taller windows add wall above)
     STAGE_FOV = 0.5,      -- Nominal camera field of view (radians); each stage calibrates its lens at runtime
     VENDOR_FIT = 0.76,    -- Share of a PlayerModel frame's height the vendor's body fills (used when the

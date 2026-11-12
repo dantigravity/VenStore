@@ -13,7 +13,9 @@ addon.Theme = Theme
 --   wall        backboard planks behind the shelves
 --   post        side posts and the dividers between bays
 --   beam        header beam across the top
---   trim        beam moulding, wallet bar, shelf brackets
+--   trim        beam moulding, wallet bar
+--   bracket     the supports under each shelf (uses the trim colour and material unless a theme
+--               gives it its own)
 --   shelf       shelf fronts, the showroom floor front, cart shelf boards
 --   deck        shelf tops and the showroom floor deck
 --   counter     counter body (and its recessed cubby back)
@@ -21,7 +23,9 @@ addon.Theme = Theme
 --   counterTop  counter slab and lip
 --   base        counter kick plate
 --   plinth      display plinth column and top
-Theme.ROLES = { "wall", "post", "beam", "trim", "shelf", "deck", "counter", "counterTrim", "counterTop", "base", "plinth" }
+Theme.ROLES = { "wall", "post", "beam", "trim", "bracket", "shelf", "deck", "counter", "counterTrim", "counterTop", "base", "plinth" }
+-- A role a theme leaves out borrows another role's colour and material.
+Theme.FALLBACK = { bracket = "trim" }
 
 -- A theme has:
 --   roles      colour of each role: the plank tint for wooden surfaces, and for surfaces with a
@@ -30,6 +34,9 @@ Theme.ROLES = { "wall", "post", "beam", "trim", "shelf", "deck", "counter", "cou
 --              without one stay wood. If the client lacks a file, that surface falls back to wood.
 --   varnish    sheen on wooden boards (1 = the original lacquered look, 0 = raw timber)
 -- The file IDs are city textures from the game's own files (dungeons/textures/...).
+-- Stormwind's stone is pale in its texture files; the game lights it blue-grey.
+local SW_STONE = { 0.74, 0.78, 0.86 }
+
 Theme.list = {
     workshop = {
         name = "Workshop",
@@ -48,29 +55,70 @@ Theme.list = {
             plinth = { 0.52, 0.33, 0.17 },
         },
     },
-    -- Masonry and dark timber: Stormwind stone walls and counter, wooden posts, beam and shelves.
+    -- Big blue-grey blocks of the city walls, and the honey timber of Stormwind's shop interiors:
+    -- diamond-inlaid trim, carved supports, plank shelves and counters.
     stormwind = {
         name = "Stormwind",
         varnish = 0.8,
         roles = {
-            wall = { 0.64, 0.63, 0.60 },
-            post = { 0.20, 0.12, 0.07 },
-            beam = { 0.24, 0.15, 0.08 },
-            trim = { 0.17, 0.10, 0.06 },
-            shelf = { 0.46, 0.31, 0.17 },
-            deck = { 0.36, 0.24, 0.13 },
-            counter = { 0.64, 0.63, 0.60 },
-            counterTrim = { 0.30, 0.19, 0.10 },
-            counterTop = { 0.77, 0.75, 0.71 },
-            base = { 0.60, 0.58, 0.54 },
-            plinth = { 0.77, 0.75, 0.71 },
+            wall = { 0.49, 0.50, 0.52 },
+            post = { 0.55, 0.41, 0.23 },
+            beam = { 0.40, 0.28, 0.17 },
+            trim = { 0.56, 0.42, 0.24 },
+            bracket = { 0.57, 0.51, 0.37 },
+            shelf = { 0.56, 0.42, 0.24 },
+            deck = { 0.76, 0.61, 0.40 },
+            counter = { 0.68, 0.52, 0.33 },
+            counterTrim = { 0.76, 0.61, 0.40 },
+            counterTop = { 0.76, 0.61, 0.40 },
+            base = { 0.44, 0.45, 0.46 },
+            plinth = { 0.62, 0.63, 0.64 },
         },
         materials = {
-            wall = { file = 353675, size = 160 },        -- stormwind_wall_05: stone blocks
-            counter = { file = 353675, size = 96 },
-            counterTop = { file = 457670, size = 128 },  -- stormwind_stone: dressed stone
-            base = { file = 465095, size = 96 },         -- stormwind_stone_drk
-            plinth = { file = 457670, size = 128 },
+            wall = { file = 130067, size = 288, tint = SW_STONE },                -- mm_strmwnd_wall_05
+            post = { file = 129400, band = { 0.45, 0.62 }, axis = "v" },          -- mm_strmwnd_supports_01: inlay
+            beam = { file = 129395, band = { 0.00, 0.23 } },                      -- mm_strmwnd_int_trim_01: beams
+            trim = { file = 129395, band = { 0.40, 0.56 } },                      -- int_trim_01: diamond inlay
+            bracket = { file = 129400, rect = { 0.00, 0.31, 0.00, 0.50 } },       -- supports_01: carved swirl
+            shelf = { file = 129395, band = { 0.40, 0.56 } },
+            deck = { file = 127441, band = { 0.50, 1.00 } },                      -- mm_strmwnd_int_furniture_01
+            counter = { file = 127979, size = 160 },                              -- mm_strmwnd_int_floor_01: boards
+            counterTrim = { file = 127441, size = 128 },
+            counterTop = { file = 127441, band = { 0.50, 1.00 } },
+            base = { file = 465095, size = 96, tint = SW_STONE },                 -- stormwind_stone_drk
+            plinth = { file = 457670, size = 128, tint = SW_STONE },              -- stormwind_stone
+        },
+    },
+    -- Darnassus: living wood. Purple leaf-carved planks, honey timber with scalloped trims,
+    -- carved swirl posts, mossy stone and tree-ring floors (the night elf druid buildings).
+    nightelf = {
+        name = "Darnassus",
+        varnish = 0.5,
+        roles = {
+            wall = { 0.25, 0.14, 0.18 },
+            post = { 0.26, 0.19, 0.12 },
+            beam = { 0.37, 0.27, 0.17 },
+            trim = { 0.38, 0.27, 0.17 },
+            shelf = { 0.21, 0.11, 0.10 },
+            deck = { 0.20, 0.15, 0.09 },
+            counter = { 0.34, 0.28, 0.20 },
+            counterTrim = { 0.33, 0.23, 0.15 },
+            counterTop = { 0.23, 0.14, 0.11 },
+            base = { 0.18, 0.29, 0.22 },
+            plinth = { 0.24, 0.18, 0.12 },
+        },
+        materials = {
+            wall = { file = 1140753, size = 256, boost = 0.35 },                   -- 7ne_druid_ceiling01: leaf planks
+            post = { file = 1139145, band = { 0.25, 0.75 }, axis = "v", boost = 0.3 }, -- 7ne_druid_column01
+            beam = { file = 1139144, band = { 0.00, 0.38 }, boost = 0.2 },         -- 7ne_druid_trims01: scallops
+            trim = { file = 1139144, band = { 0.40, 0.60 }, boost = 0.2 },
+            shelf = { file = 1140754, band = { 0.28, 0.52 }, boost = 0.4 },        -- 7ne_druid_woodtrims01
+            deck = { file = 1239340, size = 128, boost = 0.4 },                    -- 7ne_druid_woodfloor02: mossy
+            counter = { file = 1239333, rect = { 0.00, 1.00, 0.10, 1.00 }, boost = 0.2 }, -- 7ne_druid_wall01
+            counterTrim = { file = 1139144, size = 128, boost = 0.2 },
+            counterTop = { file = 1140754, band = { 0.05, 0.25 }, boost = 0.4 },
+            base = { file = 1139146, size = 96, boost = 0.3 },                     -- 7ne_druid_rockbase01: moss
+            plinth = { file = 1139145, size = 96, boost = 0.3 },
         },
     },
     -- Nailed plank walls, carved timber, teal-painted metal and grey harbour stone.
@@ -171,10 +219,20 @@ Theme.DEFAULT = "workshop"
 Theme.current = Theme.list[Theme.DEFAULT]
 Theme.currentKey = Theme.DEFAULT
 
--- Colour of `role` in `theme`, falling back to the workshop palette.
+-- Colour of `role` in `theme`, falling back to the role it borrows from, then the workshop palette.
 function Theme.Colour(theme, role)
-    local c = theme and theme.roles and theme.roles[role]
-    return c or Theme.list[Theme.DEFAULT].roles[role] or { 0.4, 0.25, 0.13 }
+    local alt = Theme.FALLBACK[role]
+    local roles, base = theme and theme.roles, Theme.list[Theme.DEFAULT].roles
+    return (roles and (roles[role] or (alt and roles[alt]))) or base[role] or (alt and base[alt])
+        or { 0.4, 0.25, 0.13 }
+end
+
+-- Material of `role` in `theme` (nil = wood).
+function Theme.Material(theme, role)
+    local mats = theme and theme.materials
+    if not mats then return nil end
+    local alt = Theme.FALLBACK[role]
+    return mats[role] or (alt and mats[alt]) or nil
 end
 
 -- ============================================================================
@@ -201,6 +259,14 @@ local MAP_THEMES = {
     -- Kul Tiras: the whole continent (Boralus, Tiragarde Sound, Drustvar, Stormsong Valley)
     [876] = "kultiras",
     [1161] = "kultiras",  -- Boralus
+    -- Night elf lands: Teldrassil, the Kalimdor forests and Val'sharah
+    [57] = "nightelf",    -- Teldrassil
+    [89] = "nightelf",    -- Darnassus
+    [62] = "nightelf",    -- Darkshore
+    [63] = "nightelf",    -- Ashenvale
+    [80] = "nightelf",    -- Moonglade
+    [198] = "nightelf",   -- Mount Hyjal
+    [641] = "nightelf",   -- Val'sharah
 }
 -- English map names, as a fallback for maps whose IDs aren't listed (the Midnight Silvermoon and
 -- Eversong, or the old-world maps on clients that number them differently). Only matches on
@@ -224,6 +290,15 @@ local NAME_THEMES = {
     ["Tiragarde Sound"] = "kultiras",
     ["Drustvar"] = "kultiras",
     ["Stormsong Valley"] = "kultiras",
+    ["Teldrassil"] = "nightelf",
+    ["Darnassus"] = "nightelf",
+    ["Darkshore"] = "nightelf",
+    ["Ashenvale"] = "nightelf",
+    ["Moonglade"] = "nightelf",
+    ["Mount Hyjal"] = "nightelf",
+    ["Val'sharah"] = "nightelf",
+    ["Amirdrassil"] = "nightelf",
+    ["Bel'ameth"] = "nightelf",
 }
 
 -- The player's map and its parents, most specific first: { { id = , name = }, ... }.
@@ -273,6 +348,7 @@ function Theme.Set(key)
     if key == Theme.currentKey then return false end
     Theme.current, Theme.currentKey = theme, key
     if addon.Wood and addon.Wood.ApplyTheme then addon.Wood.ApplyTheme(theme) end
+    if addon.Ambience and addon.ShelfFrame:IsShown() then addon.SafeCall(addon.Ambience.Refresh) end
     return true
 end
 
@@ -294,6 +370,7 @@ end
 function Theme.Slash(arg)
     local out = "|cffffd100VenStore:|r "
     arg = arg and strtrim(arg):lower() or ""
+    if arg == "darnassus" then arg = "nightelf" end -- the theme is shown as Darnassus; its key stays nightelf
     if arg == "auto" then
         if addon.db then addon.db.theme = nil end
         Theme.Refresh()

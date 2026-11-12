@@ -1,6 +1,7 @@
 -- VenStore: shopping cart on the sales counter.
 -- Drag items from the shop shelves (or Alt-Click them) onto the two shelves in the front of the
--- counter: four items at most, each with a quantity. Click the quill on the counter top to sign
+-- counter: four items at most, each with a quantity (mouse wheel, or Shift-click for a quantity
+-- picker; Shift-click a shelf item to add a chosen amount). Click the quill on the counter top to sign
 -- the bill of sale: the quill floats up, signs the slip, and everything is bought.
 local _, addon = ...
 local Wood, Showroom = addon.Wood, addon.Showroom
@@ -12,7 +13,8 @@ local Cart = { items = {}, token = 0 }
 addon.Cart = Cart
 
 local MAX_ITEMS = 4      -- two shelves, two items each
-local MAX_QTY = 20       -- per item (purchases are sent one batch / one stack at a time)
+local MAX_QTY = 999      -- per item, also limited by the stock and by your gold (purchases are
+                         -- sent one batch / one stack at a time)
 local BUY_SPACING = 0.2  -- seconds between purchase requests
 local ICON = 34
 local QUILL_TEX = "Interface\\AddOns\\VenStore\\textures\\quill"
@@ -91,7 +93,8 @@ local function SlotTooltip(self)
         GameTooltip:AddLine(" ")
         local each = (stack and stack > 1) and string.format(" (%d per purchase)", stack) or ""
         GameTooltip:AddLine(string.format("On the counter: %d%s", e.qty, each), 1, 0.82, 0)
-        GameTooltip:AddLine("Mouse wheel: change the quantity", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Mouse wheel: change the quantity (hold Shift: by 10)", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Shift-click: choose a quantity", 0.7, 0.7, 0.7)
         GameTooltip:AddLine("Right-click: take it off the counter", 0.7, 0.7, 0.7)
     else
         GameTooltip:SetText("Cart shelf", 1, 1, 1)
@@ -170,14 +173,102 @@ local function CreateSlot(id)
     b:SetScript("OnReceiveDrag", function() Cart:TakeFromCursor() end)
     b:SetScript("OnClick", function(self, button)
         if Cart:TakeFromCursor() then return end
-        if button == "RightButton" then Cart:Remove(self.id) end
+        if button == "RightButton" then
+            Cart:Remove(self.id)
+        elseif IsShiftKeyDown() and Cart.items[self.id] then
+            Cart:PickQuantity(self, Cart.items[self.id].index)
+        end
     end)
     b:EnableMouseWheel(true)
-    b:SetScript("OnMouseWheel", function(self, delta) Cart:ChangeQty(self.id, delta) end)
+    b:SetScript("OnMouseWheel", function(self, delta) Cart:ChangeQty(self.id, delta * (IsShiftKeyDown() and 10 or 1)) end)
     b:SetScript("OnEnter", SlotTooltip)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return b
 end
+
+-- ============================================================================
+-- QUANTITY PICKER (Shift-click a shelf item or a cart slot)
+-- ============================================================================
+local picker = CreateFrame("Frame", nil, addon.ShelfFrame, "BackdropTemplate")
+picker:SetSize(196, 96)
+picker:SetFrameStrata("DIALOG")
+picker:EnableMouse(true)
+picker:SetBackdrop({
+    bgFile = "Interface\Buttons\WHITE8X8",
+    edgeFile = "Interface\DialogFrame\UI-DialogBox-Border",
+    edgeSize = 20,
+    insets = { left = 5, right = 5, top = 5, bottom = 5 },
+})
+picker:SetBackdropColor(0.09, 0.06, 0.03, 0.97)
+picker:SetBackdropBorderColor(0.80, 0.66, 0.48, 1)
+picker:Hide()
+addon.ShelfFrame:HookScript("OnHide", function() picker:Hide() end)
+
+local pickerTitle = picker:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+pickerTitle:SetPoint("TOP", picker, "TOP", 0, -12)
+pickerTitle:SetWidth(176)
+pickerTitle:SetWordWrap(false)
+
+local pickerBox = CreateFrame("EditBox", nil, picker, "InputBoxTemplate")
+pickerBox:SetSize(52, 20)
+pickerBox:SetPoint("TOP", picker, "TOP", 0, -32)
+pickerBox:SetAutoFocus(false)
+pickerBox:SetNumeric(true)
+pickerBox:SetMaxLetters(4)
+pickerBox:SetJustifyH("CENTER")
+
+local function PickerButton(text, w)
+    local b = CreateFrame("Button", nil, picker, "UIPanelButtonTemplate")
+    b:SetSize(w, 22)
+    b:SetText(text)
+    return b
+end
+local minus, plus = PickerButton("-", 26), PickerButton("+", 26)
+minus:SetPoint("RIGHT", pickerBox, "LEFT", -10, 0)
+plus:SetPoint("LEFT", pickerBox, "RIGHT", 4, 0)
+local maxBtn = PickerButton("Max", 40)
+maxBtn:SetPoint("LEFT", plus, "RIGHT", 2, 0)
+local okBtn, cancelBtn = PickerButton(OKAY or "Okay", 76), PickerButton(CANCEL or "Cancel", 76)
+okBtn:SetPoint("BOTTOMRIGHT", picker, "BOTTOM", -2, 10)
+cancelBtn:SetPoint("BOTTOMLEFT", picker, "BOTTOM", 2, 10)
+
+local function PickerValue()
+    return Clamp(tonumber(pickerBox:GetText()) or 1, 1, picker.max or 1)
+end
+local function SetPickerValue(v)
+    pickerBox:SetText(tostring(Clamp(math.floor(v), 1, picker.max or 1)))
+end
+local function Step(delta)
+    local step = IsShiftKeyDown() and 10 or 1
+    SetPickerValue(PickerValue() + delta * step)
+end
+minus:SetScript("OnClick", function() Step(-1) end)
+plus:SetScript("OnClick", function() Step(1) end)
+maxBtn:SetScript("OnClick", function() SetPickerValue(picker.max or 1) end)
+picker:EnableMouseWheel(true)
+picker:SetScript("OnMouseWheel", function(_, delta) Step(delta) end)
+local function Accept()
+    local q = PickerValue()
+    picker:Hide()
+    if picker.onAccept then picker.onAccept(q) end
+end
+okBtn:SetScript("OnClick", Accept)
+cancelBtn:SetScript("OnClick", function() picker:Hide() end)
+pickerBox:SetScript("OnEnterPressed", Accept)
+pickerBox:SetScript("OnEscapePressed", function() picker:Hide() end)
+
+-- Ask how many (1..max) of the item, starting at `current`, next to `anchor`.
+local function OpenPicker(anchor, name, current, max, onAccept)
+    picker.max, picker.onAccept = math.max(1, max), onAccept
+    pickerTitle:SetText(name or "How many?")
+    SetPickerValue(current or 1)
+    picker:ClearAllPoints()
+    picker:SetPoint("BOTTOM", anchor, "TOP", 0, 6)
+    picker:Show()
+    pickerBox:SetFocus()
+    pickerBox:HighlightText()
+end
+
 for i = 1, MAX_ITEMS do slots[i] = CreateSlot(i) end
 
 -- Highlight where an item can go while one from the shop is on the cursor.
@@ -372,7 +463,7 @@ end
 
 local function PlayAnim(mode, onSigned, onDone)
     anim = { t = 0, mode = mode, onSigned = onSigned, onDone = onDone }
-    quillGlow:SetShown(mode == "sign")
+    quillGlow:Hide() -- the glow is only a hover cue; the quill signs without it
     animDriver:SetScript("OnUpdate", StepAnim)
 end
 
@@ -426,9 +517,12 @@ slip:SetScript("OnLeave", function() GameTooltip:Hide() end)
 -- CART LOGIC
 -- ============================================================================
 local function MaxQty(index)
-    local _, _, _, _, numAvailable = addon.GetVendorItemData(index)
-    if numAvailable and numAvailable >= 0 then return Clamp(numAvailable, 0, MAX_QTY) end
-    return MAX_QTY
+    local _, _, price, _, numAvailable = addon.GetVendorItemData(index)
+    local max = MAX_QTY
+    if numAvailable and numAvailable >= 0 then max = math.min(max, numAvailable) end
+    -- Gold items: no more than you can pay for (currency costs are checked when you sign).
+    if price and price > 0 and GetMoney then max = math.min(max, math.floor(GetMoney() / price)) end
+    return math.max(0, max)
 end
 
 function Cart:Refresh()
@@ -502,6 +596,28 @@ function Cart:ChangeQty(i, delta)
     self:Refresh()
 end
 
+-- Shift-click: choose how many of the item (on the counter already, or to put there).
+function Cart:PickQuantity(anchor, index)
+    if self.busy then Err("Wait for the sale to finish.") return end
+    local max = MaxQty(index)
+    if max < 1 then Err("You can't buy any more of that item.") return end
+    local current
+    for _, e in ipairs(self.items) do if e.index == index then current = e.qty end end
+    local name = addon.GetVendorItemData(index)
+    OpenPicker(anchor, name, current or 1, max, function(q)
+        for _, e in ipairs(self.items) do
+            if e.index == index then e.qty = Clamp(q, 1, math.max(1, MaxQty(index))); self:Refresh(); return end
+        end
+        local before = #self.items
+        self:Add(index)
+        local e = self.items[#self.items]
+        if #self.items > before and e and e.index == index then
+            e.qty = Clamp(q, 1, math.max(1, MaxQty(index)))
+            self:Refresh()
+        end
+    end)
+end
+
 -- Totals: copper, plus a list of { name, tex, need, have } for currencies / token items.
 function Cart:Totals()
     local copper, tokens, byName = 0, {}, {}
@@ -565,8 +681,16 @@ function Cart:Check()
             return nil, string.format("You need %d %s (you have %d).", tk.need, tk.name, tk.have)
         end
     end
-    if FreeBagSlots() < #self.items then
-        return nil, string.format("You need %d free bag slots for everything on the counter.", #self.items)
+    local needed = 0
+    for _, e in ipairs(self.items) do
+        local _, _, _, stack = addon.GetVendorItemData(e.index)
+        local count = e.qty * math.max(1, stack or 1)
+        local per = (C_Item and C_Item.GetItemMaxStackSizeByID and C_Item.GetItemMaxStackSizeByID(e.link))
+            or select(8, (C_Item and C_Item.GetItemInfo or GetItemInfo)(e.link)) or 1
+        needed = needed + math.ceil(count / math.max(1, per))
+    end
+    if FreeBagSlots() < needed then
+        return nil, string.format("You need %d free bag slots for everything on the counter.", needed)
     end
     return true
 end

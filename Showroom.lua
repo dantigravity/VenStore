@@ -97,6 +97,8 @@ end
 --               use the body's thickness, so the wingspan doesn't shrink the figure.
 --   o.sceneW, o.sceneH  scene size (default: square S x S)
 --   o.fill   share of the frame the model may fill (default FILL)
+--   o.sink   the model stands this many px below the region bottom (its lower part is cut off
+--            at the scene edge); it is framed as if the region were that much taller
 -- Returns p (px/unit), camera distance, camera Y, camera Z, wanted width, field of view, the
 -- unzoomed proportional scale, and the largest scale that still fits the frame (the zoom limit).
 local FILL = 0.92
@@ -136,7 +138,7 @@ local function FootprintPoints(box, yaw, anyAngle, core)
 end
 
 function Showroom.ComputeFraming(box, W, H, o)
-    local zoom, seat, fill = o.zoom or 1, o.seat or 0, o.fill or FILL
+    local zoom, seat, fill = o.zoom or 1, (o.seat or 0) - (o.sink or 0), o.fill or FILL
     local S = math.max(W, H)
     local SW, SH = o.sceneW or S, o.sceneH or S
     local h = math.max(0.05, box.maxZ - box.minZ)
@@ -176,7 +178,7 @@ function Showroom.ComputeFraming(box, W, H, o)
                 if sy < lowest then lowest, lowDepth = sy, depth end
             end
         end
-        if lowest < floorPx then camZ = camZ - (floorPx - lowest) * lowDepth / F end
+        if lowest < floorPx and not o.sink then camZ = camZ - (floorPx - lowest) * lowDepth / F end
         -- How far past the sides / top does any point reach?
         local over = 1
         for _, pt in ipairs(pts) do
@@ -397,7 +399,7 @@ function Stage:FramingOptions()
     return {
         seat = self.seat, yaw = self.yaw, zoom = self.zoom, lens = self.lens, fill = self.fill,
         p = self.scaleFn and self.scaleFn(self), minPx = self.minPx, anyAngle = self.anyAngle,
-        heightOnly = self.heightOnly, sceneW = sw, sceneH = sh,
+        heightOnly = self.heightOnly, sceneW = sw, sceneH = sh, sink = self.sink,
     }
 end
 
@@ -473,6 +475,9 @@ local function MakeFloor(parent, seed)
     local seam = Wood.Solid(deck, "ARTWORK", 2, 0.05, 0.02, 0.01, 0.7)
     seam:SetPoint("LEFT", deck, "LEFT", 0, 2); seam:SetPoint("RIGHT", deck, "RIGHT", 0, 2); seam:SetHeight(1)
     Wood.EdgeShade(deck, deck, "TOP", 12, 0.75, "ARTWORK", 3)
+    -- Out in the wilds the ground runs under the stall (Ambience.lua covers these with it).
+    Showroom.floors = Showroom.floors or {}
+    table.insert(Showroom.floors, { front = front, deck = deck })
     return front, deck
 end
 
@@ -838,6 +843,7 @@ local vendorGlow = vendorZone:CreateTexture(nil, "BACKGROUND", nil, 2)
 vendorGlow:SetAllPoints()
 vendorGlow:SetBlendMode("ADD")
 Wood.Gradient(vendorGlow, "VERTICAL", 1, 0.62, 0.28, 0.10, 1, 0.62, 0.28, 0)
+Showroom.vendorZone, Showroom.vendorGlow = vendorZone, vendorGlow
 
 local VENDOR_YAW = -0.35
 local displayStage
@@ -856,7 +862,8 @@ MakeInteractive(vendorModel, VENDOR_YAW) -- drag to turn; no zoom
 -- SetModelByUnit), giving the plinth an exact shared scale. `/venstore vendor` switches back to
 -- the PlayerModel if it ever looks wrong.
 local vendorStage = CreateStage(vendorZone, {
-    seat = 2, yaw = VENDOR_YAW,
+    seat = 2, yaw = VENDOR_YAW, sink = math.floor(C.STAGE_H * C.VENDOR_SINK),
+    heightOnly = true, -- framed by height: the square scene is wider than the zone, so arms can reach past it
     scaleFn = function(st) return st.lockedP end,
     onResize = function(st) st.lockedP = nil end,
     onFramed = function(st)
@@ -952,6 +959,7 @@ Wood.Paint(kick, "base", 141, { sheen = false })
 Wood.EdgeShade(kick, kick, "TOP", 5, 0.7, "ARTWORK", 2)
 
 local slab = CreateFrame("Frame", nil, counter)
+Showroom.counterSlab = slab
 slab:SetPoint("TOPLEFT", counter, "TOPLEFT", -5, 0)
 slab:SetPoint("TOPRIGHT", counter, "TOPRIGHT", 5, 0)
 slab:SetHeight(SLAB_H)
@@ -989,45 +997,120 @@ props:SetFrameLevel(counter:GetFrameLevel() + 6)
 -- Shared with Cart.lua (cart shelves in the counter front, quill and inkwell on the top).
 Showroom.counter = { frame = counter, body = body, slab = slab, props = props, width = COUNTER_W }
 
-for stack = 1, 2 do
-    local x = 10 + (stack - 1) * 14
-    local height = stack == 1 and 5 or 3
-    local shadow = Wood.Disc(props, "ARTWORK", 0, 0, 0, 0, 0.5)
-    shadow:SetSize(18, 6)
-    shadow:SetPoint("CENTER", props, "BOTTOMLEFT", x + 1, 5)
-    for c = 1, height do
-        local edge = Wood.Disc(props, "ARTWORK", 1, 0.45, 0.30, 0.06, 1)
+-- ---------------------------------------------------------------- coins and ledger on the counter
+-- Two hand-stacked piles of gold coins (ridged edges, the game's own gold coin on top, seen at an
+-- angle) and two loose coins lying flat; and a leather-bound ledger lying closed, with its page
+-- block, spine, brass corners and a ribbon bookmark.
+local GOLD = "Interface\\MoneyFrame\\UI-GoldIcon"
+
+local function CoinStack(x, count, seed)
+    local shadow = Wood.Disc(props, "ARTWORK", 0, 0, 0, 0, 0.55)
+    shadow:SetSize(19, 6)
+    shadow:SetPoint("CENTER", props, "BOTTOMLEFT", x + 1.5, 4)
+    local jitter = { 0, 0.6, -0.4, 0.5, -0.6, 0.3, -0.2, 0.4 }
+    local top
+    for c = 1, count do
+        local cx, cy = x + jitter[(c + seed) % #jitter + 1], 5 + (c - 1) * 1.7
+        -- The coin's milled edge: darker gold, with a lit rim along its top.
+        local edge = props:CreateTexture(nil, "ARTWORK", nil, 1)
+        edge:SetTexture(DISC)
         edge:SetSize(14, 6)
-        edge:SetPoint("CENTER", props, "BOTTOMLEFT", x, 6 + (c - 1) * 2)
-        local face = Wood.Disc(props, "ARTWORK", 2, 0, 0, 0, 1)
-        face:SetSize(13, 5)
-        face:SetPoint("CENTER", edge, "CENTER", 0, 1)
-        GradientDisc(face, "HORIZONTAL", 0.82, 0.62, 0.18, 1, 1, 0.90, 0.48, 1)
-        if c == height then
-            local glint = Wood.Disc(props, "ARTWORK", 3, 1, 1, 0.85, 0.75)
-            glint:SetSize(4, 1.5)
-            glint:SetPoint("CENTER", face, "CENTER", 2, 1)
-        end
+        edge:SetPoint("CENTER", props, "BOTTOMLEFT", cx, cy)
+        GradientDisc(edge, "VERTICAL", 0.36, 0.22, 0.04, 1, 0.70, 0.50, 0.14, 1)
+        local ridge = props:CreateTexture(nil, "ARTWORK", nil, 1)
+        ridge:SetColorTexture(0.25, 0.15, 0.03, 0.55)
+        ridge:SetSize(11, 0.6)
+        ridge:SetPoint("CENTER", edge, "CENTER", 0, -1.2)
+        top = edge
     end
+    -- The top coin's face: the game's gold coin, squashed into an ellipse by the angle.
+    local face = props:CreateTexture(nil, "ARTWORK", nil, 2)
+    face:SetTexture(GOLD)
+    face:SetSize(14, 6)
+    face:SetPoint("CENTER", top, "CENTER", 0, 1)
+    local glint = Wood.Disc(props, "ARTWORK", 3, 1, 1, 0.85, 0.7)
+    glint:SetSize(4, 1.4)
+    glint:SetPoint("CENTER", face, "CENTER", -2.5, 1.2)
+    glint:SetBlendMode("ADD")
 end
 
-local ledgerShadow = Wood.Disc(props, "ARTWORK", 0, 0, 0, 0, 0.5)
-ledgerShadow:SetSize(38, 8)
-ledgerShadow:SetPoint("CENTER", props, "BOTTOMRIGHT", -24, 4)
-local ledgerPages = Wood.Solid(props, "ARTWORK", 1, 0.93, 0.88, 0.74, 1)
-ledgerPages:SetSize(28, 3)
-ledgerPages:SetPoint("BOTTOMRIGHT", props, "BOTTOMRIGHT", -11, 4)
-local ledgerCover = props:CreateTexture(nil, "ARTWORK", nil, 2)
-ledgerCover:SetSize(32, 6)
-ledgerCover:SetPoint("BOTTOM", ledgerPages, "TOP", -1, 0)
-Wood.Gradient(ledgerCover, "VERTICAL", 0.42, 0.08, 0.06, 1, 0.24, 0.04, 0.03, 1)
-Wood.Perspective(ledgerCover, 3)
-local ledgerBack = Wood.Solid(props, "ARTWORK", 1, 0.30, 0.05, 0.04, 1)
-ledgerBack:SetSize(30, 1)
-ledgerBack:SetPoint("TOP", ledgerPages, "BOTTOM")
-local ledgerStrap = Wood.Solid(props, "ARTWORK", 3, 0.95, 0.78, 0.35, 1)
-ledgerStrap:SetSize(2, 9)
-ledgerStrap:SetPoint("BOTTOM", ledgerBack, "BOTTOM", 6, 0)
+local function LooseCoin(x, y)
+    local shadow = Wood.Disc(props, "ARTWORK", 0, 0, 0, 0, 0.45)
+    shadow:SetSize(13, 4)
+    shadow:SetPoint("CENTER", props, "BOTTOMLEFT", x + 1, y - 1)
+    local edge = props:CreateTexture(nil, "ARTWORK", nil, 1)
+    edge:SetTexture(DISC)
+    edge:SetSize(12, 5)
+    edge:SetPoint("CENTER", props, "BOTTOMLEFT", x, y)
+    GradientDisc(edge, "VERTICAL", 0.36, 0.22, 0.04, 1, 0.70, 0.50, 0.14, 1)
+    local face = props:CreateTexture(nil, "ARTWORK", nil, 2)
+    face:SetTexture(GOLD)
+    face:SetSize(12, 5)
+    face:SetPoint("CENTER", edge, "CENTER", 0, 0.8)
+end
+
+CoinStack(11, 6, 0)
+CoinStack(25, 4, 3)
+LooseCoin(37, 4)
+LooseCoin(31, 2.5)
+
+-- The ledger, lying closed (its foot about 10 px in from the counter top's right edge).
+do
+    local R = -10 -- right edge of the book, from the counter top's right edge
+    local shadow = Wood.Disc(props, "ARTWORK", 0, 0, 0, 0, 0.55)
+    shadow:SetSize(42, 8)
+    shadow:SetPoint("BOTTOMRIGHT", props, "BOTTOMRIGHT", R + 3, 0)
+    -- Back cover peeking under the pages.
+    local back = props:CreateTexture(nil, "ARTWORK", nil, 1)
+    back:SetSize(34, 2)
+    back:SetPoint("BOTTOMRIGHT", props, "BOTTOMRIGHT", R, 2)
+    back:SetColorTexture(0.22, 0.06, 0.04, 1)
+    -- Page block: cream, with the fine lines of the page edges.
+    local pages = props:CreateTexture(nil, "ARTWORK", nil, 1)
+    pages:SetSize(32, 4)
+    pages:SetPoint("BOTTOMRIGHT", back, "TOPRIGHT", -1, 0)
+    Wood.Gradient(pages, "VERTICAL", 0.80, 0.73, 0.58, 1, 0.96, 0.91, 0.78, 1)
+    for i = 1, 2 do
+        local line = props:CreateTexture(nil, "ARTWORK", nil, 2)
+        line:SetColorTexture(0.55, 0.47, 0.34, 0.6)
+        line:SetSize(30, 0.6)
+        line:SetPoint("BOTTOMRIGHT", pages, "BOTTOMRIGHT", -1, i * 1.3)
+    end
+    -- Front cover, seen from above: leather, lit at the far edge, with a tooled border.
+    local cover = props:CreateTexture(nil, "ARTWORK", nil, 3)
+    cover:SetSize(35, 8)
+    cover:SetPoint("BOTTOMRIGHT", pages, "TOPRIGHT", 1, -0.5)
+    Wood.Gradient(cover, "VERTICAL", 0.30, 0.07, 0.05, 1, 0.52, 0.14, 0.09, 1)
+    Wood.Perspective(cover, 3)
+    local tooling = props:CreateTexture(nil, "ARTWORK", nil, 4)
+    tooling:SetSize(27, 4)
+    tooling:SetPoint("CENTER", cover, "CENTER", 0.5, 0)
+    tooling:SetColorTexture(0.85, 0.65, 0.30, 0.35)
+    Wood.Perspective(tooling, 2)
+    local inset = props:CreateTexture(nil, "ARTWORK", nil, 5)
+    inset:SetSize(25, 2.6)
+    inset:SetPoint("CENTER", tooling, "CENTER", 0, 0)
+    Wood.Gradient(inset, "VERTICAL", 0.30, 0.07, 0.05, 1, 0.48, 0.13, 0.08, 1)
+    Wood.Perspective(inset, 2)
+    -- Spine on the left, rounded.
+    local spine = props:CreateTexture(nil, "ARTWORK", nil, 4)
+    spine:SetSize(3, 12)
+    spine:SetPoint("BOTTOMLEFT", back, "BOTTOMLEFT", -2, 0)
+    Wood.Gradient(spine, "HORIZONTAL", 0.20, 0.05, 0.03, 1, 0.42, 0.11, 0.07, 1)
+    -- Brass corner caps on the open side.
+    for _, dy in ipairs({ 0, 9 }) do
+        local corner = Wood.Disc(props, "ARTWORK", 6, 1, 1, 1, 1)
+        corner:SetSize(4, 3)
+        corner:SetPoint("CENTER", back, "BOTTOMRIGHT", -1, 1 + dy)
+        Wood.Brass(corner, 1, DISC)
+    end
+    -- Ribbon bookmark hanging out of the pages.
+    local ribbon = props:CreateTexture(nil, "ARTWORK", nil, 3)
+    ribbon:SetSize(2, 6)
+    ribbon:SetPoint("TOP", pages, "BOTTOM", 8, 2)
+    Wood.Gradient(ribbon, "VERTICAL", 0.45, 0.04, 0.04, 1, 0.75, 0.10, 0.08, 1)
+end
+
 
 -- ---------------------------------------------------------------- display zone (left)
 local displayZone = CreateFrame("Frame", nil, stageBay)
@@ -1038,6 +1121,7 @@ displayZone:SetFrameLevel(stageBay:GetFrameLevel() + 6)
 stageBay:HookScript("OnSizeChanged", function(_, _, h)
     if not h or h <= 0 then return end
     local sh = StageHeight(h)
+    if vendorStage then vendorStage.sink = math.floor(sh * C.VENDOR_SINK) end
     vendorZone:SetHeight(sh)
     displayZone:SetHeight(sh)
 end)
@@ -1047,6 +1131,7 @@ spotlight:SetPoint("TOPLEFT", 14, 0)
 spotlight:SetPoint("BOTTOMRIGHT", -8, 0)
 spotlight:SetBlendMode("ADD")
 Wood.Gradient(spotlight, "VERTICAL", 1, 0.80, 0.50, 0.03, 1, 0.80, 0.50, 0.13)
+Showroom.spotlight = spotlight
 
 -- The plinth stretches with the display bay, so a wide item gets a wide plinth.
 local PLINTH_H, PLINTH_BOTTOM = 30, 8

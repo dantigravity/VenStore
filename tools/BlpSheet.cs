@@ -189,3 +189,82 @@ public static class BlpAvg
         return sb.ToString();
     }
 }
+
+// Alpha channel of DXT5 textures as a grey image (white = opaque). The world uses it for gloss or
+// glow, but the UI would draw it as transparency, so Wood.lua draws materials opaque; masked
+// surfaces (plinth top) still blend, so give them materials with full alpha. Window glass alpha
+// is its glow mask (Ambience.lua). Returns "min/mean" alpha (0-255) per file.
+//      [BlpAlpha]::Sheet("list.txt", "alpha.png", 150, 6)
+public static class BlpAlpha
+{
+    public static byte[,] Alpha(string path, int maxSize)
+    {
+        byte[] d = File.ReadAllBytes(path);
+        int comp = d[8], alphaDepth = d[9], alphaType = d[10];
+        int w = BitConverter.ToInt32(d, 12), h = BitConverter.ToInt32(d, 16);
+        int mip = 0;
+        while ((w >> mip) > maxSize && (h >> mip) > 4 && mip < 15 && BitConverter.ToInt32(d, 20 + (mip + 1) * 4) > 0) mip++;
+        int off = BitConverter.ToInt32(d, 20 + mip * 4);
+        int mw = Math.Max(1, w >> mip), mh = Math.Max(1, h >> mip);
+        var a = new byte[mw, mh];
+        bool dxt5 = comp == 2 && alphaDepth > 1 && alphaType == 7;
+        for (int y = 0; y < mh; y++) for (int x = 0; x < mw; x++) a[x, y] = 255;
+        if (!dxt5) return a;
+        int bw = (mw + 3) / 4, bh = (mh + 3) / 4;
+        for (int by = 0; by < bh; by++)
+        for (int bx = 0; bx < bw; bx++)
+        {
+            int p = off + (by * bw + bx) * 16;
+            if (p + 16 > d.Length) continue;
+            int a0 = d[p], a1 = d[p + 1];
+            int[] pal = new int[8];
+            pal[0] = a0; pal[1] = a1;
+            if (a0 > a1) for (int i = 1; i < 7; i++) pal[i + 1] = ((7 - i) * a0 + i * a1) / 7;
+            else { for (int i = 1; i < 5; i++) pal[i + 1] = ((5 - i) * a0 + i * a1) / 5; pal[6] = 0; pal[7] = 255; }
+            ulong bits = 0;
+            for (int i = 0; i < 6; i++) bits |= (ulong)d[p + 2 + i] << (8 * i);
+            for (int i = 0; i < 16; i++)
+            {
+                int x = bx * 4 + (i & 3), y = by * 4 + (i >> 2);
+                if (x >= mw || y >= mh) continue;
+                a[x, y] = (byte)pal[(int)((bits >> (3 * i)) & 7)];
+            }
+        }
+        return a;
+    }
+
+    public static string Sheet(string listFile, string outPng, int tile, int cols)
+    {
+        var lines = File.ReadAllLines(listFile);
+        int rows = (lines.Length + cols - 1) / cols;
+        var sb = new System.Text.StringBuilder();
+        using (var sheet = new Bitmap(cols * tile, rows * (tile + 16)))
+        using (var g = Graphics.FromImage(sheet))
+        using (var font = new Font("Segoe UI", 8))
+        {
+            g.Clear(Color.FromArgb(120, 0, 120));
+            for (int n = 0; n < lines.Length; n++)
+            {
+                var parts = lines[n].Split('|');
+                var a = Alpha(parts[0], tile);
+                int w = a.GetLength(0), h = a.GetLength(1);
+                long sum = 0; int min = 255;
+                using (var bmp = new Bitmap(w, h))
+                {
+                    for (int y = 0; y < h; y++) for (int x = 0; x < w; x++)
+                    {
+                        int v = a[x, y]; sum += v; if (v < min) min = v;
+                        bmp.SetPixel(x, y, Color.FromArgb(255, v, v, v));
+                    }
+                    int ox = (n % cols) * tile, oy = (n / cols) * (tile + 16);
+                    g.DrawImage(bmp, ox, oy, tile, tile);
+                    string label = (parts.Length > 1 ? parts[1] : "") + " min " + min + " mean " + (sum / (w * h));
+                    g.DrawString(label, font, Brushes.White, ox + 2, oy + tile);
+                    sb.AppendLine(label);
+                }
+            }
+            sheet.Save(outPng, ImageFormat.Png);
+        }
+        return sb.ToString();
+    }
+}

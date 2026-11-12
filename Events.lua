@@ -54,6 +54,7 @@ local function OnMerchantShow()
     Showroom:SetMirrorShown(addon.VendorHasCosmetics())
     Showroom:SetDisplayShown(addon.VendorHasDisplayables())
     addon.ApplyGrid(ChooseGrid())
+    SafeCall(addon.Ambience.Refresh) -- window or awning, and the light for the time of day
 
     SafeCall(Showroom.Reset, Showroom)
     SafeCall(addon.Cart.Reset, addon.Cart)
@@ -118,22 +119,33 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
     end
 end)
 
+-- Default size and position (the settings menu and /venstore reset).
+function addon.ResetWindow()
+    if addon.db then addon.db.cols, addon.db.rows, addon.db.settingsPos = nil, nil, nil end
+    ShelfFrame.autoSized = false
+    ShelfFrame:ClearAllPoints()
+    ShelfFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 50)
+    addon.ApplyGrid(C.DEFAULT_COLS, C.DEFAULT_ROWS)
+    if ShelfFrame:IsShown() then SafeCall(addon.Update) end
+    print("|cffffd100VenStore:|r window size and position reset.")
+end
+
 -- ============================================================================
--- /venstore reset  - restore default size and position
+-- /venstore (opens the settings), /venstore help for the commands
 -- ============================================================================
 SLASH_VENSTORE1 = "/venstore"
 SlashCmdList.VENSTORE = function(msg)
     msg = strtrim(msg or ""):lower()
-    if msg == "reset" then
-        if addon.db then addon.db.cols, addon.db.rows = nil, nil end
-        ShelfFrame.autoSized = false
-        ShelfFrame:ClearAllPoints()
-        ShelfFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 50)
-        addon.ApplyGrid(C.DEFAULT_COLS, C.DEFAULT_ROWS)
-        if ShelfFrame:IsShown() then SafeCall(addon.Update) end
-        print("|cffffd100VenStore:|r window size and position reset.")
+    if msg == "" or msg == "settings" or msg == "options" or msg == "config" then
+        if ShelfFrame:IsShown() then addon.Options.panel:Show() else addon.Options.OpenGameSettings() end
+    elseif msg == "reset" then
+        addon.ResetWindow()
     elseif msg == "theme" or msg:match("^theme ") then
         addon.Theme.Slash(msg:sub(7))
+    elseif msg == "ambience" or msg:match("^ambience ") then
+        addon.Ambience.Slash(msg:sub(10))
+    elseif msg == "forest" then
+        addon.Ambience.ForestReport()
     elseif msg == "debug" then
         addon.Showroom.DebugDump()
     elseif msg == "vendor" then
@@ -141,9 +153,13 @@ SlashCmdList.VENSTORE = function(msg)
         print("|cffffd100VenStore:|r vendor drawn by " .. (classic and "the plain model frame." or "the 3D stage (when available)."))
     else
         print("|cffffd100VenStore|r commands:")
+        print("  /venstore - open the settings (also the gear on the shop's header beam)")
         print("  /venstore reset - restore the default window size and position")
         print("  /venstore debug - print the 3D sizing numbers (for bug reports)")
+        print("  /venstore forest - list what the 3D wilderness loaded and where (for bug reports)")
         print("  /venstore vendor - switch the vendor between the 3D stage and the plain model frame")
         print("  /venstore theme [name | auto] - show the zone theme and map, or force a theme")
+        print("  /venstore ambience [indoor | town | wild | <hour> | auto | off] - preview or turn off the time-of-day lighting")
     end
+    if addon.Options then SafeCall(addon.Options.RefreshAll) end
 end
