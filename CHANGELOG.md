@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.1
+
+### Changed
+- The 3D wilderness keeps its size when you resize the window. It is drawn as it looks with the shop two shelves high, anchored to the floor and to the vendor, so a bigger window shows more of the landscape instead of enlarging it. The horizon stays at the vendor's eye level at any size.
+
 ## 1.3.0
 
 ### Added

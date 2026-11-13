@@ -644,6 +644,7 @@ local forest, forestHorizon -- the 3D forest showing, and its measured horizon (
 local forestCam = 3         -- camera height in use (raised so no model comes too close)
 local MIN_FOREST_DEPTH = 90 -- models nearer than this to the forest camera hide the vendor in game
 local PlaceForestHook -- set once the 3D forest code below is defined
+local HorizonPx       -- likewise: the forest's horizon, px above the floor
 local laidW, laidH, laidScene -- what the cards are laid out for
 
 local function SceneLoadable(scene)
@@ -721,8 +722,7 @@ end
 backboard:HookScript("OnSizeChanged", function(_, _, h)
     if not wild:IsShown() then return end
     if forestOn then
-        if PlaceForestHook then PlaceForestHook() end
-        if h then wildGround:SetHeight(h * (forestHorizon or (forest and forest.horizon) or 0.5)) end
+        if PlaceForestHook then PlaceForestHook() end -- re-aims the camera: the land keeps its size
     else
         LayoutWild()
     end
@@ -736,7 +736,7 @@ local function PaintWild(sk)
     Wood.Gradient(wildSky, "VERTICAL", bot[1], bot[2], bot[3], 1, top[1], top[2], top[3], 1)
     local gr = scene.ground or { 0.3, 0.3, 0.2 }
     local light = 0.35 + 0.65 * sk.day
-    wildGround:SetHeight(forestOn and (wild:GetHeight() or 500) * (forestHorizon or (forest and forest.horizon) or 0.5) or scene.horizon or 190)
+    wildGround:SetHeight(forestOn and HorizonPx and HorizonPx() or scene.horizon or 190)
     Wood.Gradient(wildGround, "VERTICAL",
         gr[1] * light * tint[1], gr[2] * light * tint[2], gr[3] * light * tint[3], 1,
         (gr[1] * light * 0.4 + bot[1] * 0.6), (gr[2] * light * 0.4 + bot[2] * 0.6), (gr[3] * light * 0.4 + bot[3] * 0.6), 1)
@@ -758,11 +758,12 @@ end
 -- A model scene the size of the back wall, its camera level at a standing eye height: the horizon
 -- (`horizon`, share of the wall height from the bottom) runs about through the vendor's eyes, as it
 -- does when you stand on the same ground. Rows are laid out in screen terms: `base` is where a
--- tree's foot stands (share of the wall height from the bottom, below the horizon) and `size` how
--- tall it looks (share of the wall height). The distance follows from the base (lower = nearer) and
--- the model is scaled to look that tall there, so every tree stands on the same ground.
--- The nearest trees stand just above the counter top so their trunks show behind the vendor (trees
--- whose feet were hidden behind the counter looked like crowns lying on the ground). Only
+-- tree's foot stands (share of the two-shelf wall's height, REF_H, from the floor, below the
+-- horizon) and `size` how tall it looks (share of the same height). The distance follows from the
+-- base (lower = nearer) and the model is scaled to look that tall there, so every tree stands on the
+-- same ground.
+-- The nearest trees stand just above the counter top so their trunks show behind the vendor (a tree
+-- whose foot is hidden behind the counter reads as a crown lying on the ground). Only
 -- whole-tree models: Elwynn's big oaks are a trunk plus a separate canopy model.
 -- The scene is scaled so every model is at least MIN_FOREST_DEPTH from the camera: the 3D views
 -- share one depth buffer, so a near tree would hide the vendor. Huge scales and distances get
@@ -838,6 +839,30 @@ end
 
 local function EstimateForestF(W, H, fov)
     return math.sqrt(W * W + H * H) / (2 * math.tan(fov / 2)) * (addon.Showroom.lensFactor or 1)
+end
+
+-- FIXED SCALE. The wilds are laid out for the shop two shelves high, where the proportions look
+-- right. The land is anchored to the floor and to the vendor (who keep their size) and keeps its
+-- size on screen when the window is resized: a bigger window widens the camera's view and shows
+-- more land, the way a bigger window in a wall would, instead of blowing the land up.
+local C = addon.C
+local REF_H = 2 * C.ROW_STRIDE + C.PAD_Y - C.HEADER_H - C.FOOTER_H -- the wall at two shelves high
+local REF_W = 5 * C.COL_STRIDE + C.SHELF_PAD_X + C.MIRROR_BAY_W + C.VENDOR_W + C.STAGE_GAP - 32
+-- The trees are laid out this far (px) to each side of the vendor: enough for the widest window.
+local SPAN_LEFT = C.MAX_COLS * C.COL_STRIDE + C.SHELF_PAD_X + C.MIRROR_BAY_W + C.DISPLAY_W + C.VENDOR_W
+local SPAN_RIGHT = 260
+local REF_SPAN = REF_W * 1.15 -- the width each row's tree count was tuned for
+local forestLens = 1          -- the engine's scale over the lens model (measured in game)
+
+local function ForestTargetF() -- px per (unit / depth) the land is drawn at, whatever the window size
+    return EstimateForestF(REF_W, REF_H, forest and forest.fov or 0.95)
+end
+HorizonPx = function() -- the horizon, px above the floor: the vendor's eye level
+    return (forest and forest.horizon or 0.5) * REF_H
+end
+local function VendorOffset() -- the vendor's centre, px right of the forest view's centre
+    local vx, wx = vendorZone:GetCenter(), wild:GetCenter()
+    return (vx and wx) and (vx - wx) or 0
 end
 
 local function ForestScene()
@@ -922,8 +947,9 @@ local function LayGround()
     if not (g and forestOn and Wood.CanLoad(g.file)) then HideGround(); return end
     local W, H = wild:GetWidth(), wild:GetHeight()
     if not W or W <= 0 or not H or H <= 0 then return end
-    local F = forestF or EstimateForestF(W, H, forest.fov)
-    local hzPx = (forestHorizon or forest.horizon or 0.5) * H
+    local F = forestF or ForestTargetF()
+    local hzPx = HorizonPx()
+    local vxc = VendorOffset() -- the ground is pinned to the vendor, so a resize doesn't slide it
     local T = (g.tile or 8) * forestCam / 1.7   -- tile size in scene units (eye height ~1.7 yards)
     groundTilePx = math.max(8, T * hzPx / forestCam) -- the nearest tile, where the ground meets the floor
     local prevY = 0
@@ -942,9 +968,9 @@ local function LayGround()
         else
             local d0 = forestCam * F / (hzPx - y0)   -- distance of the strip's near edge
             local d1 = forestCam * F / (hzPx - y1)   -- and of its far edge
-            local halfW = (W / 2) * ((d0 + d1) / 2) / F
+            local k = ((d0 + d1) / 2) / F / T -- tiles per px across, at this strip's distance
             t:SetTexture(g.file, "REPEAT", "REPEAT")
-            t:SetTexCoord(-halfW / T, halfW / T, d1 / T, d0 / T)
+            t:SetTexCoord((-W / 2 - vxc) * k, (W / 2 - vxc) * k, d1 / T, d0 / T)
             t:ClearAllPoints()
             t:SetPoint("BOTTOMLEFT", wild, "BOTTOMLEFT", 0, y0)
             t:SetPoint("BOTTOMRIGHT", wild, "BOTTOMRIGHT", 0, y0)
@@ -976,19 +1002,22 @@ end
 local function PlaceForest()
     local sc = forestScene
     if not (sc and forest) then return end
-    local W, H = wild:GetWidth(), wild:GetHeight()
+    local W = wild:GetWidth()
     if not W or W <= 0 then return end
-    local F = forestF or EstimateForestF(W, H, forest.fov)
+    -- Everything in fixed px (base and size are shares of the two-shelf wall), measured from the
+    -- floor and the vendor, so a resize only changes how much of the land is in view.
+    local F = forestF or ForestTargetF()
+    local hzPx = HorizonPx()
+    local vxc = VendorOffset()
     for _, a in ipairs(forestActors) do
         if a.boxH and a.boxH > 0 then
-            local hz = forestHorizon or forest.horizon or 0.5
-            if hz - a.base < 0.02 then
+            local rise = hzPx - a.base * REF_H -- px from its foot up to the horizon
+            if rise < 0.02 * REF_H then
                 a.actor:Hide() -- a foot at the horizon would be infinitely far away
                 a.placed = false
             else
-                local depth = forestCam * F / ((hz - a.base) * H) -- its foot lands at a.base
-                local height = a.size * H * depth / F                 -- it looks a.size tall
-                local hw = (W / 2) / F * depth * 1.15                 -- half the view's width there, plus a margin
+                local depth = forestCam * F / rise           -- its foot lands at a.base
+                local height = a.size * REF_H * depth / F    -- it looks a.size tall
                 local scale = height / a.boxH
                 a.actor:SetScale(scale)
                 a.placed, a.depth, a.scale = true, depth, scale
@@ -1001,21 +1030,63 @@ local function PlaceForest()
                     a.actor:SetYaw((a.boxX or 0) > (a.boxY or 0) and math.pi / 2 or 0)
                     -- A joint between two sections (where a post stands) falls in the gap left of the vendor,
                     -- so the rails behind the vendor meet a post instead of floating loose.
-                    local joint = 0
-                    local vz = addon.Showroom and addon.Showroom.vendorZone
-                    local vx, wx = vz and vz:GetCenter(), wild:GetCenter()
-                    if vx and wx then
-                        joint = (vx - wx + (vz:GetWidth() or 0) * -0.42) * depth / F * forestRight / scale
-                    end
+                    local joint = (vxc - (vendorZone:GetWidth() or 0) * 0.42) * depth / F * forestRight / scale
                     a.actor:SetPosition(-depth / scale, joint + (a.index - a.count / 2 - 0.5) * along * 0.97, -(a.boxZ0 or 0))
+                    a.actor:Show()
                 else
-                    a.actor:SetPosition(-depth, (a.slot * 2 - 1) * hw, 0)
+                    -- Trees and bushes stand at fixed spots across the land laid out from the vendor
+                    -- (x: px right of the view's centre); those outside the view are left hidden.
+                    -- (Unlike the fence, these positions are not divided by the scale, so each model
+                    -- sits at depth x its scale; the rows' base and size values are set with that in
+                    -- effect. The scale applies to the sideways offset too, so x lands where intended.)
+                    local x = vxc - SPAN_LEFT + a.slot * (SPAN_LEFT + SPAN_RIGHT)
+                    local halfPx = math.max(a.boxX or 0, a.boxY or 0) * F / depth / 2
+                    a.actor:SetPosition(-depth, x * depth / F * forestRight, 0)
+                    a.actor:SetShown(math.abs(x) - halfPx < W / 2 + 4)
                 end
-                a.actor:Show()
             end
         end
     end
     LayGround()
+end
+
+-- Point the camera for the frame's current size: the field of view that keeps the land at its
+-- fixed scale (wider for a bigger window), and the tilt that puts the horizon at the vendor's eye
+-- level. Then place everything.
+local function AimForest()
+    local sc = forestScene
+    if not (sc and forest) then return end
+    local W, H = wild:GetWidth(), wild:GetHeight()
+    if not W or W <= 0 or not H or H <= 0 then return end
+    local FT = ForestTargetF()
+    local lens = (addon.Showroom.lensFactor or 1) * forestLens
+    sc:SetCameraFieldOfView(2 * math.atan(math.sqrt(W * W + H * H) * lens / (2 * FT)))
+    forestF = FT
+    local hzPx = HorizonPx()
+    forestHorizon = hzPx / H
+    -- The tilt direction is fixed from in-game testing.
+    sc:SetCameraOrientationByYawPitchRoll(math.pi, pitchSign * math.atan((H / 2 - hzPx) / FT), 0)
+    PlaceForest()
+    if forestOn then wildGround:SetHeight(hzPx) end
+end
+
+-- Check the engine's actual scale once the camera is applied, and correct the lens if it is off
+-- (a few rounds at most; the correction is kept for later resizes).
+local aimToken = 0
+local function MeasureAim(tries)
+    aimToken = aimToken + 1
+    local token = aimToken
+    C_Timer.After(0, function()
+        if token ~= aimToken or not forest then return end
+        local F = MeasureForestF()
+        if not (F and forestF) then return end
+        local err = F / forestF
+        if math.abs(err - 1) > 0.01 and tries > 0 then
+            forestLens = forestLens * err
+            AimForest()
+            MeasureAim(tries - 1)
+        end
+    end)
 end
 
 local function LightForest(sk, tint)
@@ -1038,7 +1109,7 @@ local function BuildForest(key)
     local spec = FORESTS[key]
     if not (sc and spec) or spec.failed then return false end
     sc:Show()
-    if forestKey == key then PlaceForest(); return true end
+    if forestKey == key then AimForest(); return true end
     forestKey, forest, forestF = key, spec, nil
     for _, a in ipairs(forestActors) do a.actor:ClearModel(); a.actor:Hide() end
     local n, seed = 0, 4242
@@ -1046,24 +1117,22 @@ local function BuildForest(key)
         seed = (seed * 16807) % 2147483647
         return seed / 2147483647
     end
-    local W, H = wild:GetWidth() or 1000, wild:GetHeight() or 500
-    sc:SetCameraFieldOfView(spec.fov)
-    local F0 = EstimateForestF(W, H, spec.fov)
+    local F0 = ForestTargetF()
     -- Scale the whole scene up (same picture) until its nearest model is MIN_FOREST_DEPTH away:
     -- the 3D views share a depth buffer, and a model close to its camera hides the vendor.
     local minBase = 1
     for _, row in ipairs(spec.rows) do minBase = math.min(minBase, row.camBase or row.base[1]) end -- camBase: keeps the camera where the trees were tuned
-    forestCam = math.max(spec.camH, MIN_FOREST_DEPTH * ((spec.horizon or 0.5) - minBase) * H / F0)
+    forestCam = math.max(spec.camH, MIN_FOREST_DEPTH * ((spec.horizon or 0.5) - minBase) * REF_H / F0)
     sc:SetCameraPosition(0, 0, forestCam)
-    local pitch = math.atan((0.5 - (spec.horizon or 0.5)) * H / F0)
-    sc:SetCameraOrientationByYawPitchRoll(math.pi, pitchSign * pitch, 0)
-    forestHorizon = nil
     for ri, row in ipairs(spec.rows) do
         -- A model can load while its textures are missing (Forever lacks the later ones and draws
         -- them as a checkerboard), so check the texture first and use the older model then.
         -- (On Forever the missing texture may still report as loadable, so it always takes the older one.)
         local old = row.fallback and row.tex and (addon.IS_FOREVER or not Wood.CanLoad(row.tex)) and true
-        for i = 1, row.count do
+        -- Each row's count is its density over REF_SPAN px; the land spans the widest window
+        -- (SPAN_LEFT + SPAN_RIGHT), so the count is scaled up to match. Trees out of view stay hidden.
+        local count = row.fence and row.count or math.ceil(row.count * (SPAN_LEFT + SPAN_RIGHT) / REF_SPAN)
+        for i = 1, count do
             n = n + 1
             local a = forestActors[n]
             if not a then
@@ -1093,8 +1162,8 @@ local function BuildForest(key)
             a.base = row.base[1] + Rand() * (row.base[2] - row.base[1])
             local size = old and row.fallbackSize or row.size
             a.size = size[1] + Rand() * (size[2] - size[1])
-            a.slot = (i - 0.5 + (Rand() - 0.5) * 0.8) / row.count -- evenly spread, jittered
-            a.fence, a.index, a.count = row.fence, i, row.count
+            a.slot = (i - 0.5 + (Rand() - 0.5) * 0.8) / count -- evenly spread, jittered
+            a.fence, a.index, a.count = row.fence, i, count
             a.row, a.placed = ri, false
             a.actor:Hide()
             local turn = Rand() * math.pi * 2
@@ -1121,24 +1190,17 @@ local function BuildForest(key)
         spec.failed, forestKey = true, nil
         addon.SafeCall(Ambience.Refresh)
     end)
-    -- Measure the engine's projection once the camera is applied, then re-place to match it.
-    C_Timer.After(0, function()
-        local F = MeasureForestF()
-        if F then
-            forestF = F
-            -- Re-aim the tilt with the measured lens, so the horizon lands where the ground is drawn
-            -- (the first aim used an estimate). The tilt direction is fixed from in-game testing.
-            local hz = spec.horizon or 0.5
-            sc:SetCameraOrientationByYawPitchRoll(math.pi, pitchSign * math.atan((0.5 - hz) * H / F), 0)
-        end
-        forestHorizon = spec.horizon or 0.5
-        PlaceForest()
-        if forestOn then wildGround:SetHeight((forestHorizon or spec.horizon or 0.5) * (wild:GetHeight() or 500)) end
-    end)
+    -- Aim for this frame size, then check the engine's actual scale once the camera is applied.
+    AimForest()
+    MeasureAim(3)
     return true
 end
 
-PlaceForestHook = PlaceForest
+-- On a resize: re-aim (the land keeps its size; the view widens or narrows) and re-check the lens.
+PlaceForestHook = function()
+    AimForest()
+    MeasureAim(2)
+end
 
 -- /venstore forest: what the 3D wilderness has loaded and where it put it (for tuning and reports).
 function Ambience.ForestReport()
@@ -1149,8 +1211,8 @@ function Ambience.ForestReport()
     end
     local W, H = wild:GetWidth() or 0, wild:GetHeight() or 0
     local F = forestF or EstimateForestF(W, H, forest.fov)
-    print(out .. string.format("forest %s: wall %.0f x %.0f px, lens %s%.0f, horizon %.2f, camera height %.1f",
-        tostring(forestKey), W, H, forestF and "" or "~", F, forestHorizon or forest.horizon or 0.5, forestCam))
+    print(out .. string.format("forest %s: wall %.0f x %.0f px (land fixed to a %.0f px wall), lens %.0f (correction %.2f), horizon %.0f px up, camera height %.1f",
+        tostring(forestKey), W, H, REF_H, F, forestLens, HorizonPx(), forestCam))
     for ri, row in ipairs(forest.rows) do
         local total, loaded, placed, sample = 0, 0, 0, nil
         for _, a in ipairs(forestActors) do
@@ -1191,7 +1253,7 @@ local function ShowWild(key, sk)
         for _, t in ipairs(cards) do t:Hide() end
         wild:Show()
         PaintWild(sk)
-        wildGround:SetHeight((forestHorizon or (FORESTS[scene.forest] or {}).horizon or 0.5) * (wild:GetHeight() or 500)) -- ground up to the horizon
+        wildGround:SetHeight(HorizonPx()) -- ground up to the horizon
         LightForest(sk, scene.tint)
         return true
     end

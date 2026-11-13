@@ -2,7 +2,7 @@
 ## Title: VenStore
 ## Notes: Turns the merchant window into a 3D wooden shop: shelves, a try-on mirror, a display plinth and a sales counter with a shopping cart.
 ## Author: Dantigravity
-## Version: v1.3.0
+## Version: v1.3.1
 ## SavedVariables: VenStoreDB
 ## IconTexture: Interface\Icons\INV_Misc_Bag_10
 ## Category-enUS: Inventory
