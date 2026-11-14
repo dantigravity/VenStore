@@ -541,6 +541,15 @@ for _, f in ipairs(postDepth) do f:Hide() end
 -- Only the stall has the square posts and braces; the shop indoors keeps its flat corner posts.
 valance:HookScript("OnShow", function() for _, f in ipairs(postDepth) do f:Show() end end)
 valance:HookScript("OnHide", function() for _, f in ipairs(postDepth) do f:Hide() end end)
+-- The awning hangs over the top shelf, so the shelves move down by its depth while it is up.
+local AWNING_DROP = 18
+local function DropShelves(px)
+    if (addon.shelfDrop or 0) == px then return end
+    addon.shelfDrop = px
+    if addon.LayoutShelves then addon.LayoutShelves() end
+end
+valance:HookScript("OnShow", function() DropShelves(AWNING_DROP) end)
+valance:HookScript("OnHide", function() DropShelves(0) end)
 
 -- ============================================================================
 -- WILDERNESS: outdoors away from towns, the stall stands in front of the region's own trees and

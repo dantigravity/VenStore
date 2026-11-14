@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.2
+
+### Changed
+- The shop opens three items wide and three shelves high on first use and after **Reset window size**. A size you have already chosen is kept.
+
+### Fixed
+- Outdoors, the stall's awning no longer covers the top shelf's items: the shelves move down while the awning is up.
+
 ## 1.3.1
 
 ### Changed

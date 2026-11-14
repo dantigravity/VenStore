@@ -6,7 +6,7 @@ VenStore replaces the merchant window in World of Warcraft (Retail and WoW Forev
 
 ## Features
 
-- **Shelf grid:** Items stand on shelves, with price cards that show each currency. Drag the corner grip to resize the grid from 3×2 up to 7×5. The size you pick is saved.
+- **Shelf grid:** Items stand on shelves, with price cards that show each currency. The shop opens 3×3; drag the corner grip to resize the grid from 3×2 up to 7×5. The size you pick is saved.
 - **Try-on mirror:** The tall cast-brass mirror only appears when the vendor sells transmog items (armor, weapons, ensembles and arsenals). Ctrl-Click one of these items to see it on your character. Your character fills the glass from head to feet at every angle; wings, weapons and spell effects that reach past the edge disappear behind the frame. The mirror stands on the shop floor, so your reflection stands at the same level as the vendor. The pose, undress and reset buttons are on the board above the glass.
 - **Display plinth:** The plinth only appears when the vendor sells something with a 3D model: a mount, pet or housing decor. Toys have no model the game exposes. Ctrl-Click one of these items to show it to the left of the vendor. Items are measured and drawn in proportion to the vendor, standing on the plinth. The bay widens for long items, and nothing is cut off.
 - **Fits the screen:** The window scales itself down if it would be larger than the screen.

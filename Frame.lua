@@ -8,7 +8,7 @@ addon.ShelfFrame = ShelfFrame
 ShelfFrame.page = 1
 ShelfFrame.showMirror = true
 ShelfFrame.showDisplay = true
-ShelfFrame.cols, ShelfFrame.rows = 4, 2
+ShelfFrame.cols, ShelfFrame.rows = 3, 3
 
 -- ============================================================================
 -- GRID SIZING (width depends on which right-hand bays are visible)

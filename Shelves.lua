@@ -72,10 +72,11 @@ end
 -- Re-anchor shelves to the current wing width (the right edge moves when the mirror toggles).
 function addon.LayoutShelves()
     local rightInset = addon.GetWingWidth() + 20
+    local drop = addon.shelfDrop or 0 -- lowered under the outdoor stall's awning (Ambience.lua)
     for _, shelf in ipairs(ShelfFrame.shelves) do
         shelf:ClearAllPoints()
-        shelf:SetPoint("TOPLEFT", ShelfFrame, "TOPLEFT", 24, shelf.y)
-        shelf:SetPoint("TOPRIGHT", ShelfFrame, "TOPRIGHT", -rightInset, shelf.y)
+        shelf:SetPoint("TOPLEFT", ShelfFrame, "TOPLEFT", 24, shelf.y - drop)
+        shelf:SetPoint("TOPRIGHT", ShelfFrame, "TOPRIGHT", -rightInset, shelf.y - drop)
     end
 end
 addon.LayoutShelves()

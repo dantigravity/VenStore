@@ -26,7 +26,7 @@ local C = {
     STAGE_FOV = 0.5,      -- Nominal camera field of view (radians); each stage calibrates its lens at runtime
     VENDOR_FIT = 0.76,    -- Share of a PlayerModel frame's height the vendor's body fills (used when the
                           -- vendor isn't on a 3D stage)
-    DEFAULT_COLS = 4,     -- First-run grid
+    DEFAULT_COLS = 3,     -- First-run grid
     DEFAULT_ROWS = 3,
     LAYOUT_VERSION = 2,   -- Bump to discard saved grid sizes when the default layout changes
 
