@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0
+
+### Added
+- **Blind cord.** When a vendor has more items than the shelves hold, a twisted hemp cord hangs at the right end of the shelves, so it's clear there's more to see. A parchment tally tied beside its wooden pull shows which items are in view (for example "1-9 of 20").
+  - Click the cord, or drag its pull down, to bring up the next shelf-load. After the last one it starts again from the first. Right-click goes back.
+  - The cord also gives a tug when you change page with the mouse wheel or the Prev / Next buttons, and a small one when the shop opens.
+  - Each new shelf-load fades in from the bottom shelf up, like a blind being raised.
+  - The rope texture is new (`textures/rope.tga`), so restart the game client after updating; `/reload` doesn't load new files.
+
 ## 1.3.2
 
 ### Changed

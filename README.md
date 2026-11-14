@@ -6,7 +6,7 @@ VenStore replaces the merchant window in World of Warcraft (Retail and WoW Forev
 
 ## Features
 
-- **Shelf grid:** Items stand on shelves, with price cards that show each currency. The shop opens 3×3; drag the corner grip to resize the grid from 3×2 up to 7×5. The size you pick is saved.
+- **Shelf grid:** Items stand on shelves, with price cards that show each currency. The shop opens 3×3; drag the corner grip to resize the grid from 3×2 up to 7×5. The size you pick is saved. When the vendor has more items than the shelves hold, a blind cord hangs at the end of the shelves with a tally of which items are in view; pull it to raise the next shelf-load.
 - **Try-on mirror:** The tall cast-brass mirror only appears when the vendor sells transmog items (armor, weapons, ensembles and arsenals). Ctrl-Click one of these items to see it on your character. Your character fills the glass from head to feet at every angle; wings, weapons and spell effects that reach past the edge disappear behind the frame. The mirror stands on the shop floor, so your reflection stands at the same level as the vendor. The pose, undress and reset buttons are on the board above the glass.
 - **Display plinth:** The plinth only appears when the vendor sells something with a 3D model: a mount, pet or housing decor. Toys have no model the game exposes. Ctrl-Click one of these items to show it to the left of the vendor. Items are measured and drawn in proportion to the vendor, standing on the plinth. The bay widens for long items, and nothing is cut off.
 - **Fits the screen:** The window scales itself down if it would be larger than the screen.
@@ -44,6 +44,7 @@ VenStore replaces the merchant window in World of Warcraft (Retail and WoW Forev
 | Buyback button | Show items you sold this session; click one to buy it back |
 | Right-click the plinth model, or its × | Clear the display |
 | Mouse wheel on the shop, or click a page stud | Change page |
+| Click or drag down the blind cord (right-click: back) | Next shelf-load of items, wrapping round to the first |
 | `/venstore` | Open the settings menu (same as the gear) |
 | `/venstore reset` | Restore the default size and position |
 | `/venstore theme [name \| auto]` | Show the zone theme and map, or force a theme |
@@ -70,8 +71,10 @@ VenStore replaces the merchant window in World of Warcraft (Retail and WoW Forev
 | `Events.lua` | Saved settings, merchant events, slash command |
 | `textures/plank.tga` | Wood grain texture (1024×128, tiles horizontally) |
 | `textures/quill.tga` | Quill (32×128 with alpha) |
+| `textures/rope.tga` | Twisted rope for the blind cord (16×64 with alpha, tiles vertically) |
 | `tools/WoodGen.cs` | Generator for the wood texture (not shipped) |
 | `tools/QuillGen.cs` | Generator for the quill texture (not shipped) |
+| `tools/RopeGen.cs` | Generator for the rope texture (not shipped) |
 
 To regenerate the wood texture, run this from PowerShell in the addon folder:
 
