@@ -172,7 +172,7 @@ function Options.Build(parent, x, y)
     -- Lighting ----------------------------------------------------------------
     Heading("Lighting")
     local ambienceToggle = Toggle("Time-of-day lighting",
-        "The light follows the time of day. Outdoors the shop becomes a market stall: in town it keeps its walls, and out in the wilds the region's own trees and shrubs stand behind it.",
+        "The light follows the time of day: bright windows and sky by day, torches and lanterns at night. Off keeps it midday: indoors the plain workshop, outdoors the stall in steady daylight.",
         "On", "Off", function(on)
             DB().ambience = (not on) and "off" or nil
             Changed()
@@ -180,7 +180,14 @@ function Options.Build(parent, x, y)
     local breezeToggle = Toggle("Breeze outdoors",
         "A soft wind plays while the shop is a market stall (on the game's ambience volume).",
         "On", "Off", function(on)
-            DB().breeze = (not on) and false or nil
+            -- (Not `(not on) and false or nil`: that is always nil.) false = off; nil = the default, on.
+            if on then DB().breeze = nil else DB().breeze = false end
+            Changed()
+        end)
+    local stockToggle = Toggle("Stock yard",
+        "Out in the wilds, the vendor's mounts, pets and decor wait in the yard beyond the fence. Big ones stand further back.",
+        "On", "Off", function(on)
+            if on then DB().stockYard = nil else DB().stockYard = false end
             Changed()
         end)
     y = y - 4
@@ -232,10 +239,12 @@ function Options.Build(parent, x, y)
 
         local on = addon.Ambience.Enabled()
         ambienceToggle.Set(on)
-        breezeToggle.Set(db.breeze ~= false, on)
+        -- The setting, breeze and stock yard work with the lighting off; only the hour needs it.
+        breezeToggle.Set(db.breeze ~= false)
+        stockToggle.Set(db.stockYard ~= false)
         for _, b in ipairs(placeButtons) do
             b:SetSelected(b.key == db.place)
-            b:SetEnabled(on)
+            b:SetEnabled(true)
         end
         local here = addon.Ambience.AutoPlace()
         placeNote:SetText("Auto: indoors, in a town, or out in the wilds. Here: " .. (here == "indoor" and "indoors" or here == "town" and "town" or "wilds") .. ".")

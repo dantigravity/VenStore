@@ -15,7 +15,8 @@ VenStore replaces the merchant window in World of Warcraft (Retail and WoW Forev
 - **Merchant services:** Buyback, Sell All Junk, Repair All (right-click to repair single items) and Guild Repair buttons sit on the header beam; repair buttons only appear at vendors who repair. Drop an item from your bags on the shop to sell it (right-clicking it in your bags works too).
 - **Zone themes:** In Stormwind, Orgrimmar, Silvermoon, Kul Tiras and Darnassus (and the other night elf lands), the shop is built from that capital's own materials, using the game's textures. Everywhere else it keeps the workshop look.
 - **Time of day and setting:** The lighting follows the realm clock, and a window in the theme's style shows the sky. Indoors it's a shop; in a town the walls stay with open-air light; out in the wilds it becomes a market stall in front of the zone's real 3D trees, bushes and a fence, with wall torches at dusk, a flickering counter lantern and an optional breeze.
-- **Settings menu:** Click the gear on the header beam, or type `/venstore`, to pick the theme, setting, time of day, lighting and breeze.
+- **Stock yard:** Out in the wilds, the vendor's mounts, pets and decor stand in the yard behind the stall, in proportion to the vendor and smaller with distance. A wider window shows more of the yard. The item on the plinth leaves the yard while it's shown, and the bottom shelf comes down while stock stands behind it.
+- **Settings menu:** Click the gear on the header beam, or type `/venstore`, to pick the theme, setting, time of day, lighting, breeze and stock yard.
 - **Real wood grain:** The wood uses a generated texture (`textures/plank.tga`), tinted and lit per surface.
 - **Filters:** Filter items by currency, item type and class/spec.
 - **Wallet bar:** Shows how much of each currency this vendor accepts that you currently have.
@@ -51,7 +52,7 @@ VenStore replaces the merchant window in World of Warcraft (Retail and WoW Forev
 | `/venstore ambience [indoor \| town \| wild \| <hour> \| auto \| off]` | Preview a setting or hour, or turn the time-of-day lighting off |
 | `/venstore vendor` | Switch the vendor between the 3D stage and the plain model view |
 | `/venstore debug` | Print sizing information for bug reports |
-| `/venstore forest` | List what the 3D wilderness loaded and where (for bug reports) |
+| `/venstore forest` | List what the 3D wilderness and stock yard loaded and where (for bug reports) |
 
 ## Project layout
 
@@ -66,7 +67,7 @@ VenStore replaces the merchant window in World of Warcraft (Retail and WoW Forev
 | `Services.lua` | Buyback, Sell All Junk, Repair and Guild Repair buttons |
 | `Shelves.lua` | Shelves, item slots, price cards, main refresh |
 | `Filters.lua` | Currency / type / spec dropdowns |
-| `Ambience.lua` | Time of day, windows, outdoor stall, 3D wilderness, torches, lantern and breeze |
+| `Ambience.lua` | Time of day, windows, outdoor stall, 3D wilderness, stock yard, torches, lantern and breeze |
 | `Options.lua` | Settings menu and its gear button |
 | `Events.lua` | Saved settings, merchant events, slash command |
 | `textures/plank.tga` | Wood grain texture (1024×128, tiles horizontally) |

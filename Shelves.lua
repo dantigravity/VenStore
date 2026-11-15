@@ -541,6 +541,9 @@ function addon.Update()
     end
 
     local cols, rows = addon.GetGridDims()
+    -- Out in the wilds the bottom shelf comes down while the stock yard has an item behind it
+    -- (Ambience.lua), so the shop shows one row fewer.
+    if addon.shelfYield and rows > 1 then rows = rows - 1 end
     local perPage = cols * rows
     local totalPages = math.max(1, math.ceil(#filteredItemIndices / perPage))
     ShelfFrame.page = math.max(1, math.min(ShelfFrame.page or 1, totalPages))

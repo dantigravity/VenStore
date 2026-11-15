@@ -653,6 +653,8 @@ local forest, forestHorizon -- the 3D forest showing, and its measured horizon (
 local forestCam = 3         -- camera height in use (raised so no model comes too close)
 local MIN_FOREST_DEPTH = 90 -- models nearer than this to the forest camera hide the vendor in game
 local PlaceForestHook -- set once the 3D forest code below is defined
+local PlaceStock      -- set by the stock yard code (after the forest)
+local UpdateShelfYield -- likewise: the bottom shelf comes down while stock stands behind it
 local HorizonPx       -- likewise: the forest's horizon, px above the floor
 local laidW, laidH, laidScene -- what the cards are laid out for
 
@@ -823,6 +825,15 @@ local FORESTS = {
         },
     },
 }
+
+-- Where every fence stands: its foot this far up the wall (share of REF_H), just in front of the
+-- first whole trees, leaving the ground in front of it for the stock yard. The rows' fence sizes
+-- were tuned standing at their own base (0.10); moved back, a fence shrinks by perspective.
+local FENCE_BASE = 0.36
+local function FenceShrink(spec, row)
+    local hz = spec.horizon or 0.5
+    return math.max(0.05, (hz - FENCE_BASE) / math.max(0.05, hz - row.base[1]))
+end
 
 local forestScene, forestKey
 local forestActors = {}
@@ -1057,6 +1068,7 @@ local function PlaceForest()
         end
     end
     LayGround()
+    if PlaceStock then PlaceStock() end
 end
 
 -- Point the camera for the frame's current size: the field of view that keeps the land at its
@@ -1141,7 +1153,14 @@ local function BuildForest(key)
         -- Each row's count is its density over REF_SPAN px; the land spans the widest window
         -- (SPAN_LEFT + SPAN_RIGHT), so the count is scaled up to match. Trees out of view stay hidden.
         local count = row.fence and row.count or math.ceil(row.count * (SPAN_LEFT + SPAN_RIGHT) / REF_SPAN)
+        -- The fence stands back at FENCE_BASE (the stock yard is in front of it): smaller by
+        -- perspective, so it takes more sections to span the land.
+        local fenceK = row.fence and FenceShrink(spec, row) or 1
+        if row.fence then count = math.ceil(row.count / fenceK) end
         for i = 1, count do
+            -- Sections past the row's own count draw no random numbers, so the rows after the fence
+            -- keep the layout they were tuned with.
+            local Rand = (row.fence and i > row.count) and function() return 0.5 end or Rand
             n = n + 1
             local a = forestActors[n]
             if not a then
@@ -1171,6 +1190,7 @@ local function BuildForest(key)
             a.base = row.base[1] + Rand() * (row.base[2] - row.base[1])
             local size = old and row.fallbackSize or row.size
             a.size = size[1] + Rand() * (size[2] - size[1])
+            if row.fence then a.base, a.size = FENCE_BASE, a.size * fenceK end
             a.slot = (i - 0.5 + (Rand() - 0.5) * 0.8) / count -- evenly spread, jittered
             a.fence, a.index, a.count = row.fence, i, count
             a.row, a.placed = ri, false
@@ -1211,6 +1231,258 @@ PlaceForestHook = function()
     MeasureAim(2)
 end
 
+-- ============================================================================
+-- STOCK YARD: the vendor's own mounts, pets and decor wait in the yard beyond the fence
+-- ============================================================================
+-- Each item the plinth could show becomes one more model in the forest scene, in proportion to the
+-- vendor (the same shared scale the plinth starts from, but without the plinth's frame shrinking
+-- big items to fit). The horizon runs through the vendor's eyes, so a model as tall as the vendor's
+-- eye height reaches the horizon wherever it stands: px per unit = rise / eye height. Each stands
+-- somewhere on the open ground in front of the fence (which stands back at FENCE_BASE), and
+-- perspective makes it smaller the further back it is. Neighbours alternate nearer and further, so
+-- the yard has depth. Only a true
+-- giant is scaled down, to STOCK_MAX_H. The yard starts behind the vendor and runs left, and the item on
+-- the plinth leaves the yard while it's shown, as if fetched from stock.
+local STOCK_MAX = 12                    -- items in the yard (those past the window's left edge stay hidden)
+local STOCK_SPACING = 0.85              -- gap between neighbours, as a share of their half-widths
+local STOCK_MAX_H = 0.75                -- the tallest an item may look (share of REF_H: the horizon)
+-- Per kind of item: `scale` multiplies its size against the vendor, and `maxH` is the tallest it
+-- may stand, in vendor heights. Battle pets often reuse a full-size creature's model (the world
+-- shrinks the pet), so pets are held to about half the vendor's height; mounts may tower a little.
+local STOCK_KINDS = {
+    mount = { scale = 1.0, maxH = 1.6 },
+    pet   = { scale = 1.0, maxH = 0.5 },
+    decor = { scale = 1.0, maxH = 0.5 }, -- decor models often come oversized
+}
+local VENDOR_EYE = 0.93                 -- the vendor's eyes, as a share of their height
+local STOCK_FRONT = 0.10                -- the front of the yard: a foot this far up the wall (share of REF_H)
+local STOCK_NEAR, STOCK_FAR = 0.10, 0.85 -- the band used, from the front (0) to the fence (1)
+
+local stockActors = {}
+local stockSig         -- the items the yard was loaded for
+local stockOnPlinth    -- key of the item now on the display plinth
+
+local function StockKey(info)
+    if not info then return nil end
+    if info.kind == "decor" then return info.asset and ("decor:" .. info.asset) or nil end
+    if info.displayID and info.displayID > 0 then return info.kind .. ":" .. info.displayID end
+end
+
+local function Hash01(s) -- a steady 0..1 from a string, so each item keeps its spot and pose
+    local h = 7
+    for i = 1, #s do h = (h * 31 + s:byte(i)) % 1000003 end
+    return h / 1000003
+end
+
+-- The vendor's displayable items (not cosmetics: the mirror has those), one of each model.
+local function GatherStock()
+    local list, seen = {}, {}
+    if not (GetMerchantNumItems and GetMerchantItemLink) then return list end
+    for idx = 1, GetMerchantNumItems() or 0 do
+        local link = GetMerchantItemLink(idx)
+        if link and not addon.IsCosmeticItem(link, (addon.GetVendorItemData(idx))) then
+            local info = addon.GetDisplayInfo(link)
+            local key = StockKey(info)
+            if key and not seen[key] then
+                seen[key] = true
+                list[#list + 1] = { key = key, info = info }
+                if #list >= STOCK_MAX then break end
+            end
+        end
+    end
+    return list
+end
+
+-- The yard's front and back (the fence's foot), px above the floor.
+local function YardBand()
+    return STOCK_FRONT * REF_H, FENCE_BASE * REF_H
+end
+
+-- While stock stands behind the bottom shelf, that shelf comes down (the shop shows one row
+-- fewer, Shelves.lua) so the stock can be seen. The bottom shelf's bay runs from the floor up to
+-- the shelf above it; an item counts when its picture overlaps that bay.
+local function StockBehindBottomShelf()
+    if not (wild:IsShown() and forestOn) then return false end
+    local _, rows = addon.GetGridDims()
+    local shelf = ShelfFrame.shelves and ShelfFrame.shelves[rows]
+    if not (shelf and rows > 1) then return false end
+    -- From the window's own edges, the way LayoutShelves anchors it (a hidden shelf may not report
+    -- its position).
+    local fl, fr, ft = ShelfFrame:GetLeft(), ShelfFrame:GetRight(), ShelfFrame:GetTop()
+    if not (fl and fr and ft) then return false end
+    local sl, sr = fl + 24, fr - (addon.GetWingWidth() + 20)
+    local st = ft + shelf.y - (addon.shelfDrop or 0)
+    local wx, wb = wild:GetCenter(), wild:GetBottom()
+    if not (sl and sr and st and wx and wb) then return false end
+    local bayTop = st - wb + C.ROW_STRIDE - 30 -- px above the floor: under the next shelf up
+    for _, s in ipairs(stockActors) do
+        if s.placed and s.actor:IsShown() and s.half then
+            local cx = wx + s.x
+            if cx + s.half > sl and cx - s.half < sr and s.foot < bayTop and s.foot + s.px > 0 then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+UpdateShelfYield = function()
+    local yield = StockBehindBottomShelf()
+    if (addon.shelfYield or false) ~= yield then
+        addon.shelfYield = yield
+        if ShelfFrame:IsShown() and addon.Update then addon.SafeCall(addon.Update) end
+    end
+end
+
+PlaceStock = function()
+    local sc = forestScene
+    if not (sc and forest and forestOn) then
+        for _, s in ipairs(stockActors) do s.actor:Hide(); s.placed = false end
+        UpdateShelfYield()
+        return
+    end
+    local W = wild:GetWidth()
+    if not W or W <= 0 then return end
+    local F = forestF or ForestTargetF()
+    local hzPx = HorizonPx()
+    local vxc = VendorOffset()
+    -- Distances as "rise": px from a foot up to the horizon (bigger = nearer; size goes with it).
+    local frontFoot, fenceFoot = YardBand()
+    local frontRise = math.max(1, hzPx - frontFoot)
+    local fenceRise = math.max(1, math.min(frontRise * 0.9, hzPx - fenceFoot))
+    local Showroom = addon.Showroom
+    local vendorH = Showroom.VendorHeight and Showroom.VendorHeight() or 2.1 -- game units
+    local eye = VENDOR_EYE * vendorH
+    local vendorP = Showroom.SharedScale and Showroom.SharedScale() -- the vendor's own px per unit
+
+    -- Laid out on the land like the trees (pinned to the vendor, where the land is pinned): the first
+    -- item stands behind the vendor, the rest in a line to the left, each as far from the last as
+    -- their widths need. A wider window shows more of the line; nothing slides when it's resized.
+    -- The item on the plinth keeps its spot (a gap in the line) while it's away.
+    local cursor = vxc + (vendorZone:GetWidth() or C.VENDOR_W) * 0.5 -- the vendor's right edge
+    local prevHalf
+    for _, s in ipairs(stockActors) do
+        s.placed = false
+        if not (s.key and s.boxH and s.boxH > 0) then s.actor:Hide() end
+    end
+    for _, s in ipairs(stockActors) do
+      if s.key and s.boxH and s.boxH > 0 then
+        local i = s.index or 1
+        local h = s.boxH -- model units
+        -- How far back: alternately nearer and further across the band, a little jittered.
+        local t = (i % 2 == 1 and 0.25 or 0.7) + (s.jitter - 0.5) * 0.3
+        t = STOCK_NEAR + (STOCK_FAR - STOCK_NEAR) * math.max(0, math.min(1, t))
+        local rise = frontRise + t * (fenceRise - frontRise)
+        -- In proportion to the vendor there (px per unit), times its kind's factor; no taller than
+        -- its kind allows (in vendor heights), and never past the horizon cap.
+        local kind = STOCK_KINDS[s.kind] or STOCK_KINDS.decor
+        local units = math.min(h * kind.scale, kind.maxH * vendorH) -- its height, as it stands
+        s.shrunk = units < h * kind.scale - 0.001
+        local p = math.min(rise / eye * units / h, STOCK_MAX_H * REF_H / h)
+        local px = h * p
+        local depth = forestCam * F / rise
+        local scale = p * depth / F
+        -- Its width on screen as turned, and its spot: the next one left along the line (neighbours
+        -- stand at different depths, so they may overlap a little).
+        local yaw = s.yaw or 0
+        local half = (math.abs((s.boxX or 0) * math.sin(yaw)) + math.abs((s.boxY or 0) * math.cos(yaw))) * p / 2
+        half = math.max(half, 12)
+        if prevHalf then
+            cursor = cursor - (prevHalf + half) * STOCK_SPACING - 8
+        else
+            cursor = cursor - half
+        end
+        prevHalf = half
+        local x = cursor + (s.jitter - 0.5) * 16
+        s.actor:SetScale(scale)
+        s.actor:SetPosition(-depth / scale, x * depth / F * forestRight / scale, -(s.boxZ0 or 0))
+        s.actor:SetShown(s.key ~= stockOnPlinth and math.abs(x) - half < W / 2 + 4)
+        s.placed, s.depth, s.scale, s.px, s.x = true, depth, scale, px, x
+        s.half, s.foot = half, hzPx - rise -- on screen: half its width, and its foot above the floor
+        s.back = vendorP and vendorP > 0 and p / vendorP or nil -- its size against the vendor's
+      end
+    end
+    UpdateShelfYield()
+end
+
+local function LoadStock(i, item)
+    local sc = forestScene
+    local s = stockActors[i]
+    if not s then
+        local ok, actor = pcall(sc.CreateActor, sc, nil, "ModelSceneActorTemplate")
+        if not ok or not actor then return false end
+        if actor.SetUseCenterForOrigin then actor:SetUseCenterForOrigin(true, true, false) end
+        s = { actor = actor }
+        stockActors[i] = s
+        actor:SetOnModelLoadedCallback(function()
+            local token, tries = s.key, 0
+            local function Read()
+                if s.key ~= token then return end
+                local minX, minY, minZ, maxX, maxY, maxZ = actor:GetActiveBoundingBox()
+                if minZ and maxZ and maxZ > minZ then
+                    s.boxH, s.boxZ0 = maxZ - minZ, minZ
+                    s.boxX, s.boxY = (maxX or 0) - (minX or 0), (maxY or 0) - (minY or 0)
+                    PlaceStock()
+                elseif tries < 30 then
+                    tries = tries + 1
+                    C_Timer.After(0.1, Read)
+                end
+            end
+            Read()
+        end)
+    end
+    s.key, s.kind, s.boxH, s.placed, s.index = item.key, item.info.kind, nil, false, i
+    s.jitter = Hash01(item.key)
+    s.actor:Hide()
+    s.actor:SetScale(1)
+    -- Creatures stand three-quarters on, alternately facing left and right; decor faces out.
+    if item.info.kind == "decor" then
+        s.yaw = (s.jitter - 0.5) * 0.8
+    else
+        s.yaw = (i % 2 == 0 and 1 or -1) * (0.9 + 0.5 * s.jitter)
+    end
+    s.actor:SetYaw(s.yaw)
+    if item.info.kind == "decor" then
+        s.actor:SetModelByFileID(item.info.asset)
+    else
+        s.actor:SetModelByCreatureDisplayID(item.info.displayID)
+    end
+    return true
+end
+
+-- Load the vendor's stock into the yard (only when the items change), then place it.
+local function SyncStock()
+    local on = forestOn and forest and forestScene and wild:IsShown() and (addon.db or {}).stockYard ~= false
+    local items = on and GatherStock() or {}
+    local keys = {}
+    for i, it in ipairs(items) do keys[i] = it.key end
+    local sig = table.concat(keys, ",")
+    if sig ~= stockSig then
+        stockSig = sig
+        local n = 0
+        for i, it in ipairs(items) do
+            if not LoadStock(i, it) then break end
+            n = i
+        end
+        for i = n + 1, #stockActors do
+            local s = stockActors[i]
+            s.key, s.boxH, s.placed = nil, nil, false
+            s.actor:ClearModel()
+            s.actor:Hide()
+        end
+    end
+    PlaceStock()
+end
+Ambience.SyncStock = function() SyncStock() end
+
+-- The display plinth shows (or stops showing) an item: it leaves the yard meanwhile.
+function Ambience.SetPlinthItem(info)
+    local key = StockKey(info)
+    if key == stockOnPlinth then return end
+    stockOnPlinth = key
+    PlaceStock()
+end
+
 -- /venstore forest: what the 3D wilderness has loaded and where it put it (for tuning and reports).
 function Ambience.ForestReport()
     local out = "|cffffd100VenStore:|r "
@@ -1223,16 +1495,26 @@ function Ambience.ForestReport()
     print(out .. string.format("forest %s: wall %.0f x %.0f px (land fixed to a %.0f px wall), lens %.0f (correction %.2f), horizon %.0f px up, camera height %.1f",
         tostring(forestKey), W, H, REF_H, F, forestLens, HorizonPx(), forestCam))
     for ri, row in ipairs(forest.rows) do
-        local total, loaded, placed, sample = 0, 0, 0, nil
+        local total, loaded, placed, sample, lo, hi = 0, 0, 0, nil, nil, nil
         for _, a in ipairs(forestActors) do
             if a.row == ri and a.actor then
                 total = total + 1
-                if a.boxH then loaded = loaded + 1 end
+                if a.boxH then
+                    loaded = loaded + 1
+                    lo, hi = math.min(lo or a.boxH, a.boxH), math.max(hi or a.boxH, a.boxH)
+                end
                 if a.placed then placed = placed + 1; sample = sample or a end
             end
         end
-        local line = string.format("  row %d%s: %d models, %d loaded, %d placed", ri, row.fence and " (fence)" or "",
-            total, loaded, placed)
+        -- Which fence model: the row's own, or its older fallback (Forever, or a missing texture).
+        local which = ""
+        if row.fence and row.fallback then
+            local old = row.tex and (addon.IS_FOREVER or not Wood.CanLoad(row.tex))
+            which = old and string.format(" fallback %d", row.fallback) or string.format(" %d", row.files[1])
+        end
+        local line = string.format("  row %d%s%s: %d models, %d loaded, %d placed", ri, row.fence and " (fence" or "",
+            row.fence and which .. ")" or "", total, loaded, placed)
+        if lo then line = line .. string.format(", models %.1f-%.1f units tall", lo, hi) end
         if sample then
             local px = sample.boxH * sample.scale * F / sample.depth
             line = line .. string.format(", e.g. %.0f units away, %.0f px tall", sample.depth, px)
@@ -1244,6 +1526,27 @@ function Ambience.ForestReport()
             end
         end
         print(line)
+    end
+    local stock = 0
+    for _, s in ipairs(stockActors) do if s.key then stock = stock + 1 end end
+    if (addon.db or {}).stockYard == false then
+        print("  stock yard: off (settings menu)")
+    elseif stock == 0 then
+        print("  stock yard: this vendor sells no mounts, pets or decor")
+    else
+        local vendorH = addon.Showroom.VendorHeight and addon.Showroom.VendorHeight() or 2.1
+        print(string.format("  stock yard: %d items%s; vendor %.1f units tall", stock,
+            stockOnPlinth and " (one is on the plinth)" or "", vendorH))
+        for _, s in ipairs(stockActors) do
+            if s.key then
+                if s.placed then
+                    print(string.format("    %s: model %.1f units (%.1f vendor heights)%s, %.0f units away, %.0f px tall (%s), %.0f px from centre%s",
+                        s.key, s.boxH, s.boxH / vendorH, s.shrunk and " held to its kind's limit" or "", s.depth, s.px, s.back and string.format("%.0f%% of the vendor's scale", s.back * 100) or "vendor scale unknown", s.x, s.actor:IsShown() and "" or " (out of view)"))
+                else
+                    print(string.format("    %s: %s", s.key, s.boxH and "on the plinth" or "not loaded"))
+                end
+            end
+        end
     end
 end
 
@@ -1629,11 +1932,19 @@ local function ApplyOff()
 end
 
 function Ambience.Refresh()
-    if not Ambience.Enabled() then ApplyOff(); return end
-    local hour = Ambience.Hour()
+    -- With the lighting off it's always midday: indoors the plain workshop (no window, the lanterns
+    -- and spotlight as they were), outdoors the stall in steady daylight.
+    local lit = Ambience.Enabled()
     local place = Ambience.Place()
     local indoors = place == "indoor"
     local key = addon.Theme.currentKey or "workshop"
+    if not lit and indoors then
+        ApplyOff()
+        SyncStock() -- clears the yard (and brings the bottom shelf back)
+        Ambience.state = { hour = 12, place = place, indoors = true, wilderness = false, key = key, sky = Ambience.Sky(12), lit = false }
+        return
+    end
+    local hour = lit and Ambience.Hour() or 12
     local sk = Ambience.Sky(hour)
 
     local wilderness = false
@@ -1660,8 +1971,9 @@ function Ambience.Refresh()
             fill:Show()
         end
     end
-    Ambience.state = { hour = hour, place = place, indoors = indoors, wilderness = wilderness, key = key, sky = sk }
+    Ambience.state = { hour = hour, place = place, indoors = indoors, wilderness = wilderness, key = key, sky = sk, lit = lit }
     if not (wilderness and forestOn) then FloorGround(false) end
+    SyncStock() -- the vendor's stock in the yard beyond the fence (out in the wilds)
 
     -- Torches indoors, the candle outdoors; the plinth spotlight and the vendor's lamp glow are
     -- indoor lights. The breeze blows outdoors.
@@ -1684,7 +1996,7 @@ ShelfFrame:HookScript("OnShow", function()
             if currentWindow then PlaceWindow(currentWindow) end
             if wild:IsShown() then LayoutWild(); if Ambience.state then PaintWild(Ambience.state.sky) end end
             local st = Ambience.state
-            if st and not st.indoors and Ambience.Enabled() and DB().breeze ~= false and ShelfFrame:IsShown() then
+            if st and not st.indoors and DB().breeze ~= false and ShelfFrame:IsShown() then
                 StartBreeze(st.key)
             end
             if st and st.indoors then PlaceTorches() end
@@ -1732,13 +2044,15 @@ function Ambience.Slash(arg)
         DB().hour = math.min(24, h + (tonumber(m) or 0) / 60) % 24
     end
     Ambience.Refresh()
-    if not Ambience.Enabled() then
-        print(out .. "ambience off (the plain workshop lighting). /venstore ambience on to turn it back on.")
-        return
-    end
     local st = Ambience.state
     local where = PLACE_NAMES[st.place] or st.place
     if st.place == "wild" and not st.wilderness then where = where .. " (no wilderness for this theme yet: town look)" end
+    if not Ambience.Enabled() then
+        print(out .. string.format("%s, %s%s, time-of-day lighting off (%s). /venstore ambience on to turn it back on.",
+            addon.Theme.current.name, where, DB().place and " (set)" or "",
+            st.indoors and "the plain workshop" or "steady daylight"))
+        return
+    end
     print(out .. string.format("%s, %s%s, %s%s (day %.0f%%).",
         addon.Theme.current.name, where, DB().place and " (set)" or "",
         Ambience.FormatHour(st.hour), DB().hour and " (set)" or " realm time",

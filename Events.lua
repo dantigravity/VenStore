@@ -75,6 +75,7 @@ local function OnMerchantUpdate()
         changed = true
     end
     if changed then addon.ApplyGrid() end
+    SafeCall(addon.Ambience.SyncStock) -- item data arriving late fills the stock yard
     SafeCall(addon.Update)
     SafeCall(addon.Cart.Refresh, addon.Cart)
 end

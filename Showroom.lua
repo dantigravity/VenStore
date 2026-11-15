@@ -1239,6 +1239,10 @@ local function SharedScale()
     if h <= 0 then return nil end
     return h * C.VENDOR_FIT / (vendorHeight or FALLBACK_VENDOR_H)
 end
+Showroom.SharedScale = SharedScale
+-- The vendor's height in game units (a typical humanoid until measured): the wilderness's stock
+-- yard sizes items in proportion to the vendor.
+function Showroom.VendorHeight() return vendorHeight or FALLBACK_VENDOR_H end
 
 displayStage = CreateStage(displayArea, {
     seat = PLINTH_SEAT, yaw = 0.6, autoYaw = true, wheelZoom = true, minPx = MIN_ITEM_PX, anyAngle = true,
@@ -1264,6 +1268,8 @@ function Showroom.OnVendorMeasured()
         Showroom.FitBayToModel()
         displayStage:Frame()
     end
+    -- The stock yard behind the stall is sized in proportion to the vendor too.
+    if addon.Ambience and addon.Ambience.SyncStock then addon.SafeCall(addon.Ambience.SyncStock) end
 end
 
 -- /venstore debug: prints the sizing numbers (window, vendor scale, each stage's lens and scale).
@@ -1353,6 +1359,7 @@ function Showroom:ClearDisplay()
     plinthPlate:Hide()
     SetDisplayHint("Ctrl-Click an item\nto display it here")
     self:SetDisplayExtra(0)
+    if addon.Ambience and addon.Ambience.SetPlinthItem then addon.Ambience.SetPlinthItem(nil) end
 end
 displayClear:SetScript("OnClick", function() Showroom:ClearDisplay() end)
 MakeInteractive(displayModel, 0.35, { zoom = true, onRightClick = function() Showroom:ClearDisplay() end })
@@ -1377,6 +1384,8 @@ local function ShowOnDisplay(info, name)
     plinthPlate:Show()
     displayClear:Show()
     VendorPresentGesture()
+    -- The item leaves the stock yard behind the stall while it's on the plinth (out in the wilds).
+    if addon.Ambience and addon.Ambience.SetPlinthItem then addon.Ambience.SetPlinthItem(info) end
 
     local hasDisplayID = info.displayID and info.displayID > 0
     if displayStage and (info.kind == "decor" or hasDisplayID) then

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.5.0
+
+### Added
+- **Stock yard.** Out in the wilds, the vendor's mounts, pets and housing decor wait in the yard behind the stall, as if the shop keeps its stock there.
+  - Items stand in proportion to the vendor, nearer or further back, and shrink with distance. Pets and decor are held to about half the vendor's height, since many of their models come oversized; mounts may stand a little taller than the vendor.
+  - The yard starts behind the vendor and runs left across the land. It stays put when you resize the window: a wider window shows more of it.
+  - An item shown on the display plinth leaves the yard while it's there.
+  - While an item stands behind the bottom shelf, that shelf comes down so the item can be seen, and the shop shows one row fewer.
+  - Turn it on or off with **Stock yard** in the settings menu.
+- `/venstore forest` also lists the stock yard's items, and each row's model sizes and which fence model loaded.
+
+### Changed
+- **Time-of-day lighting** now only turns the lighting off. The setting (Indoors, Town or Wilds), the breeze and the stock yard still work while it's off: indoors you get the plain workshop, outdoors the stall in steady daylight. Only the time-of-day controls are greyed out.
+- Out in the wilds, the fence stands further back, just in front of the trees, leaving open ground in front of it for the stock yard.
+
+### Fixed
+- The **Breeze outdoors** Off button now turns the breeze off. Before, it could never be switched off.
+
 ## 1.4.0
 
 ### Added
