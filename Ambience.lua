@@ -794,11 +794,14 @@ local FORESTS = {
     },
     ashenvale = {
         camH = 3, fov = 0.95, horizon = 0.75, ground = { file = 186836, tile = 3 }, -- ashenvalemossbase
+        exact = true, -- its tree models range from 12 to 130 units tall (see PlaceForest)
         rows = {
             { files = { 201223, 201224, 201226, 201228, 201230 }, count = 11, base = { 0.62, 0.66 }, size = { 0.22, 0.30 }, alpha = 0.6 },
             { files = { 201223, 201224, 201226, 201228, 201230 }, count = 5, base = { 0.49, 0.57 }, size = { 0.36, 0.48 }, alpha = 0.85 },
             { files = { 201223, 201224, 201226, 201228, 201230 }, count = 4, base = { 0.43, 0.47 }, size = { 0.56, 0.70 } },
-            { files = { 1379080 }, tex = 1379088, fallback = 189795, fallbackSize = { 0.46, 0.46 }, count = 22, base = { 0.10, 0.10 }, size = { 0.42, 0.42 }, fence = true, camBase = -0.05 }, -- 7ne_druid_fence01 (else elwynnwoodfence01)
+            { files = { 1379080 }, tex = 1379088, fallback = 189795, fallbackSize = { 0.46, 0.46 }, count = 22, base = { 0.10, 0.10 }, size = { 0.18, 0.18 }, fence = true, camBase = -0.05 }, -- 7ne_druid_fence01 (else elwynnwoodfence01)
+            -- (The druid fence is a low border, 1.0 x 3.2 units against Elwynn's 2.5 x 4.3: sized to the
+            -- same scale as the Elwynn fence, not to its height, so its sections aren't stretched.)
             { files = { 189692, 189693, 189694, 189695, 189696, 189697, 189698 }, count = 10, base = { 0.03, 0.12 }, size = { 0.10, 0.16 } },
         },
     },
@@ -1059,9 +1062,19 @@ local function PlaceForest()
                     -- (Unlike the fence, these positions are not divided by the scale, so each model
                     -- sits at depth x its scale; the rows' base and size values are set with that in
                     -- effect. The scale applies to the sideways offset too, so x lands where intended.)
+                    -- A forest marked `exact` places its trees like the fence instead (positions divided
+                    -- by the scale, feet on the ground), so every tree looks its row's `size` at its
+                    -- `base` whatever its model's own size. Needed where a row mixes very different
+                    -- model sizes (Ashenvale's run from 12 to 130 units: otherwise a 10x spread).
                     local x = vxc - SPAN_LEFT + a.slot * (SPAN_LEFT + SPAN_RIGHT)
-                    local halfPx = math.max(a.boxX or 0, a.boxY or 0) * F / depth / 2
-                    a.actor:SetPosition(-depth, x * depth / F * forestRight, 0)
+                    local halfPx
+                    if forest.exact then
+                        halfPx = math.max(a.boxX or 0, a.boxY or 0) * scale * F / depth / 2
+                        a.actor:SetPosition(-depth / scale, x * depth / F * forestRight / scale, -(a.boxZ0 or 0))
+                    else
+                        halfPx = math.max(a.boxX or 0, a.boxY or 0) * F / depth / 2
+                        a.actor:SetPosition(-depth, x * depth / F * forestRight, 0)
+                    end
                     a.actor:SetShown(math.abs(x) - halfPx < W / 2 + 4)
                 end
             end

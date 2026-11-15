@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1
+
+### Fixed
+- **Darnassus theme, out in the wilds:** the trees behind the stall are the right size again. Ashenvale's tree models vary hugely in size, so one tree could tower over the stall while its neighbours looked tiny. Each tree now stands at its intended height and distance.
+- On Retail, the night elf fence is drawn at its real proportions as a low border, instead of being stretched to the height of a rail fence.
+
 ## 1.5.0
 
 ### Added
