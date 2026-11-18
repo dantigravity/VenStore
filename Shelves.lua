@@ -332,6 +332,18 @@ local function OnSlotClick(self, button)
     end
 end
 
+-- Double-click an item to put it in the cart. The first click picked it up (plain click), so the
+-- second takes it back off the cursor. Modified and right double-clicks act as two single clicks.
+local function OnSlotDoubleClick(self, button)
+    local index = self.merchantIndex
+    if button ~= "LeftButton" or not index or self.buybackIndex or IsModifierKeyDown() then
+        return OnSlotClick(self, button)
+    end
+    local kind, cursorIndex = GetCursorInfo()
+    if kind == "merchant" and cursorIndex == index then ClearCursor() end
+    addon.Cart:Add(index)
+end
+
 local function CreateSlot(i)
     local S = C.SLOT_SIZE
     local btn = CreateFrame("Button", "VenStoreSlot" .. i, ShelfFrame, "BackdropTemplate")
@@ -444,6 +456,7 @@ local function CreateSlot(i)
     btn:SetScript("OnEnter", OnSlotEnter)
     btn:SetScript("OnLeave", OnSlotLeave)
     btn:SetScript("OnClick", OnSlotClick)
+    btn:SetScript("OnDoubleClick", OnSlotDoubleClick)
     -- Drag an item off the shelf: onto your bags to buy it now, or onto the counter shelves (cart).
     btn:RegisterForDrag("LeftButton")
     btn:SetScript("OnDragStart", function(self)

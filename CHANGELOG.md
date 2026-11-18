@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.0
+
+### Added
+- **Cart total:** a parchment tally tacked under the counter's nameplate shows the running total of everything in the cart (gold, plus any currencies or token items). It turns red when you can't afford it all.
+- **Double-click** an item on the shop shelves to add it to the cart.
+
+### Changed
+- Hovering an item in the cart shows a short note (the item, how many, and what they cost) instead of the full item tooltip.
+- The mirror now opens showing your character as they look right now (the same as **Reset to My Appearance**), instead of empty glass.
+
 ## 1.5.1
 
 ### Fixed

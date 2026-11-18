@@ -81,6 +81,40 @@ emptyHint:SetPoint("BOTTOM", boards[1], "TOP", 0, 10)
 emptyHint:SetText("Drag items here")
 emptyHint:SetTextColor(0.85, 0.70, 0.48, 0.7)
 
+-- Running total: a parchment tally tag tacked to the counter front, just under the nameplate
+-- (shown while the cart has something in it). It sizes itself to the amount written on it.
+local totalTag = CreateFrame("Frame", nil, body, "BackdropTemplate")
+totalTag:SetHeight(19)
+totalTag:SetPoint("TOP", body, "TOP", 0, -24)
+totalTag:SetFrameLevel(body:GetFrameLevel() + 12) -- above the cubby and the cart items
+totalTag:EnableMouse(false)                      -- drops still land on the cubby underneath
+totalTag:SetBackdrop({
+    bgFile = "Interface\\Buttons\\WHITE8X8",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    edgeSize = 10,
+    insets = { left = 2, right = 2, top = 2, bottom = 2 },
+})
+totalTag:SetBackdropColor(1, 1, 1, 1)
+totalTag:SetBackdropBorderColor(0.52, 0.39, 0.24, 1)
+local tagShadow = totalTag:CreateTexture(nil, "BACKGROUND", nil, -1)
+tagShadow:SetPoint("TOPLEFT", 3, -3); tagShadow:SetPoint("BOTTOMRIGHT", 4, -4)
+tagShadow:SetColorTexture(0, 0, 0, 0.55)
+local tagPaper = totalTag:CreateTexture(nil, "BORDER", nil, 0)
+tagPaper:SetPoint("TOPLEFT", 2, -2); tagPaper:SetPoint("BOTTOMRIGHT", -2, 2)
+Wood.Gradient(tagPaper, "VERTICAL", 0.86, 0.80, 0.66, 1, 0.98, 0.95, 0.86, 1)
+for _, side in ipairs({ "LEFT", "RIGHT" }) do
+    local tack = Wood.Disc(totalTag, "OVERLAY", 3, 0, 0, 0, 1)
+    tack:SetSize(5, 5)
+    tack:SetPoint("CENTER", totalTag, side, side == "LEFT" and 6 or -6, 0)
+    Wood.Brass(tack, 1, DISC)
+end
+local totalText = totalTag:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+totalText:SetPoint("CENTER", 0, 0)
+totalText:SetWordWrap(false)
+totalText:SetShadowColor(1, 0.98, 0.92, 1)
+totalText:SetShadowOffset(1, -1)
+totalTag:Hide()
+
 -- ---------------------------------------------------------------- cart slots
 local slots = {}
 
@@ -88,18 +122,20 @@ local function SlotTooltip(self)
     local e = Cart.items[self.id]
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     if e then
-        GameTooltip:SetMerchantItem(e.index)
-        local _, _, _, stack = addon.GetVendorItemData(e.index)
-        GameTooltip:AddLine(" ")
-        local each = (stack and stack > 1) and string.format(" (%d per purchase)", stack) or ""
-        GameTooltip:AddLine(string.format("On the counter: %d%s", e.qty, each), 1, 0.82, 0)
-        GameTooltip:AddLine("Mouse wheel: change the quantity (hold Shift: by 10)", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine("Shift-click: choose a quantity", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine("Right-click: take it off the counter", 0.7, 0.7, 0.7)
+        -- Short and in-world: the item, how many, what they cost. (The shop shelves keep the full
+        -- item tooltip.)
+        local name, _, _, stack = addon.GetVendorItemData(e.index)
+        local q = C_Item and C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(e.link)
+        local c = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
+        GameTooltip:SetText(name or "?", c and c.r or 1, c and c.g or 1, c and c.b or 1)
+        local cost, short = Cart.CostString(Cart:Totals({ e }))
+        local s = short and 0.25 or 1
+        GameTooltip:AddDoubleLine(string.format("%d on the counter", e.qty * math.max(1, stack or 1)), cost,
+            0.85, 0.85, 0.85, 1, s, s)
+        GameTooltip:AddLine("Wheel: amount   Right-click: remove", 0.5, 0.5, 0.5)
     else
         GameTooltip:SetText("Cart shelf", 1, 1, 1)
-        GameTooltip:AddLine("Drag an item from the shelves here (or Alt-Click it) to add it to your cart. "
-            .. "Then click the quill to sign for everything.", 1, 0.82, 0, true)
+        GameTooltip:AddLine("Drag or double-click an item to add it.", 0.85, 0.85, 0.85)
     end
     GameTooltip:Show()
 end
@@ -548,6 +584,7 @@ function Cart:Refresh()
         if GameTooltip:IsOwned(b) then SlotTooltip(b) end
     end
     emptyHint:SetShown(#self.items == 0)
+    self:UpdateTotal()
     slip:SetShown(#self.items > 0 or self.signing == true)
     if not self.signing then ShowSignature(-1) end
     UpdateDropGlow()
@@ -619,9 +656,10 @@ function Cart:PickQuantity(anchor, index)
 end
 
 -- Totals: copper, plus a list of { name, tex, need, have } for currencies / token items.
-function Cart:Totals()
+-- `items` defaults to the whole cart.
+function Cart:Totals(items)
     local copper, tokens, byName = 0, {}, {}
-    for _, e in ipairs(self.items) do
+    for _, e in ipairs(items or self.items) do
         local _, _, price, _, _, _, _, extended = addon.GetVendorItemData(e.index)
         copper = copper + (price or 0) * e.qty
         if extended and GetMerchantItemCostInfo then
@@ -641,6 +679,42 @@ function Cart:Totals()
     end
     return copper, tokens
 end
+
+-- "1g 20s  5 [icon]" for a gold amount and a token list; short = true when you can't pay it.
+local function CostString(copper, tokens)
+    local parts, short = {}, false
+    if copper > 0 then
+        parts[#parts + 1] = addon.CoinString(copper, 10)
+        if GetMoney() < copper then short = true end
+    end
+    for _, tk in ipairs(tokens) do
+        parts[#parts + 1] = string.format("%d |T%s:10:10:0:0|t", tk.need, tostring(tk.tex or ""))
+        if tk.have and tk.have < tk.need then short = true end
+    end
+    if #parts == 0 then parts[1] = FREE or "Free" end
+    return table.concat(parts, "  "), short
+end
+Cart.CostString = CostString
+
+-- The tally tag: gold, then each currency / token item. Red when you can't pay for it all.
+function Cart:UpdateTotal()
+    if #self.items == 0 then totalTag:Hide() return end
+    local text, short = CostString(self:Totals())
+    totalText:SetText("Total:  " .. text)
+    if short then
+        totalText:SetTextColor(0.62, 0.05, 0.02, 1)
+    else
+        totalText:SetTextColor(0.06, 0.03, 0.01, 1)
+    end
+    totalTag:SetWidth(math.min(parts.width - 8, math.ceil(totalText:GetStringWidth() or 0) + 30))
+    totalTag:Show()
+end
+
+-- Gold or currencies changing can make the cart (un)affordable.
+local walletWatch = CreateFrame("Frame")
+addon.RegisterEventSafe(walletWatch, "PLAYER_MONEY")
+addon.RegisterEventSafe(walletWatch, "CURRENCY_DISPLAY_UPDATE")
+walletWatch:SetScript("OnEvent", function() Cart:UpdateTotal() end)
 
 local function FreeBagSlots()
     if not (C_Container and C_Container.GetContainerNumFreeSlots) then return math.huge end

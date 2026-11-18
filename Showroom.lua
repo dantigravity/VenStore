@@ -774,6 +774,18 @@ local function ResetMirror()
     ApplyPose()
 end
 
+-- The mirror starts on: the player as they look right now (the same as Reset to My Appearance).
+-- Loaded a frame after the window shows, so the stage measures and calibrates while visible.
+local autoMirrorToken = 0
+local function AutoLoadMirror()
+    autoMirrorToken = autoMirrorToken + 1
+    local token = autoMirrorToken
+    C_Timer.After(0, function()
+        if token ~= autoMirrorToken or mirrorLoaded then return end
+        if ShelfFrame:IsShown() and ShelfFrame.showMirror then ResetMirror() end
+    end)
+end
+
 local function SelectPose(i)
     EnsureMirrorPlayer()
     poseIndex = i
@@ -1438,8 +1450,11 @@ function Showroom:Layout()
 end
 
 function Showroom:SetMirrorShown(show)
+    local was = ShelfFrame.showMirror
     ShelfFrame.showMirror = show and true or false
     self:Layout()
+    -- Brought in late (item data arrived after the window opened): show the player straight away.
+    if ShelfFrame.showMirror and not was and ShelfFrame:IsShown() then AutoLoadMirror() end
 end
 
 -- Extra width for the display bay while a long model is shown (0 = normal size).
@@ -1493,6 +1508,7 @@ function Showroom:Reset()
     poseIndex = 1
     for i, b in ipairs(poseButtons) do b:SetSelected(i == 1) end
     SetMirrorGlass(true)
+    AutoLoadMirror()
 end
 
 function Showroom:OnMerchantClosed()
@@ -1503,6 +1519,7 @@ function Showroom:OnMerchantClosed()
     if displayStage then displayStage:Clear() end
     if mirrorStage then mirrorStage:Clear() end
     mirrorLoaded = false
+    autoMirrorToken = autoMirrorToken + 1
 end
 
 Showroom._CreateStage = CreateStage -- test hook

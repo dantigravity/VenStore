@@ -7,11 +7,11 @@ VenStore replaces the merchant window in World of Warcraft (Retail and WoW Forev
 ## Features
 
 - **Shelf grid:** Items stand on shelves, with price cards that show each currency. The shop opens 3×3; drag the corner grip to resize the grid from 3×2 up to 7×5. The size you pick is saved. When the vendor has more items than the shelves hold, a blind cord hangs at the end of the shelves with a tally of which items are in view; pull it to raise the next shelf-load.
-- **Try-on mirror:** The tall cast-brass mirror only appears when the vendor sells transmog items (armor, weapons, ensembles and arsenals). Ctrl-Click one of these items to see it on your character. Your character fills the glass from head to feet at every angle; wings, weapons and spell effects that reach past the edge disappear behind the frame. The mirror stands on the shop floor, so your reflection stands at the same level as the vendor. The pose, undress and reset buttons are on the board above the glass.
+- **Try-on mirror:** The tall cast-brass mirror only appears when the vendor sells transmog items (armor, weapons, ensembles and arsenals). It opens showing your character as they look right now; Ctrl-Click one of these items to try it on. Your character fills the glass from head to feet at every angle; wings, weapons and spell effects that reach past the edge disappear behind the frame. The mirror stands on the shop floor, so your reflection stands at the same level as the vendor. The pose, undress and reset buttons are on the board above the glass.
 - **Display plinth:** The plinth only appears when the vendor sells something with a 3D model: a mount, pet or housing decor. Toys have no model the game exposes. Ctrl-Click one of these items to show it to the left of the vendor. Items are measured and drawn in proportion to the vendor, standing on the plinth. The bay widens for long items, and nothing is cut off.
 - **Fits the screen:** The window scales itself down if it would be larger than the screen.
 - **Sales counter:** The live vendor model stands behind a tall wooden counter with a brass nameplate.
-- **Shopping cart:** The front of the counter has two shelves. Drag up to four items onto them (or Alt-Click them on the shop shelves); the mouse wheel sets how many of each. Click the quill on the counter to sign the bill of sale: the quill floats up and signs, then everything is bought at once. Before signing, VenStore checks your gold, currencies and bag space; the quill's tooltip lists the totals.
+- **Shopping cart:** The front of the counter has two shelves. Drag up to four items onto them (or Alt-Click or double-click them on the shop shelves); the mouse wheel sets how many of each. A parchment tally under the counter's nameplate shows the running total, in red when you can't afford it. Hover a cart item for a short note of how many and what they cost. Click the quill on the counter to sign the bill of sale: the quill floats up and signs, then everything is bought at once. Before signing, VenStore checks your gold, currencies and bag space; the quill's tooltip lists the totals.
 - **Merchant services:** Buyback, Sell All Junk, Repair All (right-click to repair single items) and Guild Repair buttons sit on the header beam; repair buttons only appear at vendors who repair. Drop an item from your bags on the shop to sell it (right-clicking it in your bags works too).
 - **Zone themes:** In Stormwind, Orgrimmar, Silvermoon, Kul Tiras and Darnassus (and the other night elf lands), the shop is built from that capital's own materials, using the game's textures. Everywhere else it keeps the workshop look.
 - **Time of day and setting:** The lighting follows the realm clock, and a window in the theme's style shows the sky. Indoors it's a shop; in a town the walls stay with open-air light; out in the wilds it becomes a market stall in front of the zone's real 3D trees, bushes and a fence, with wall torches at dusk, a flickering counter lantern and an optional breeze.
@@ -26,7 +26,7 @@ VenStore replaces the merchant window in World of Warcraft (Retail and WoW Forev
 | Action | Result |
 | --- | --- |
 | Left-Click or drag item | Pick up (drop on your bags to buy now, or on the counter shelves to add it to the cart) |
-| Alt-Click item | Add it to the cart |
+| Alt-Click or double-click item | Add it to the cart |
 | Right-Click item | Buy one |
 | Ctrl-Click item | Preview in the mirror or on the plinth |
 | Shift-Click with chat open, or other modified clicks | Standard link / compare behavior |
