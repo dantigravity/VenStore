@@ -36,6 +36,8 @@ Theme.FALLBACK = { bracket = "trim" }
 -- The file IDs are city textures from the game's own files (dungeons/textures/...).
 -- Stormwind's stone is pale in its texture files; the game lights it blue-grey.
 local SW_STONE = { 0.74, 0.78, 0.86 }
+-- Zephras Isle's pale elven stone, cooled by the open sky of Skywall.
+local ZEPH_STONE = { 0.90, 0.95, 1.00 }
 
 Theme.list = {
     workshop = {
@@ -214,6 +216,42 @@ Theme.list = {
             plinth = { file = 850412, size = 96, boost = 0.7 },
         },
     },
+    -- Zephras Isle (WoW Forever): the Skyborne build in pale Highborne stone, as in the zone's
+    -- towers, domes and colonnades. Fluted walls and columns, scrolled friezes with teal inlay,
+    -- carved arch panels and smooth marble. The isle's own building textures aren't named in the
+    -- game's file list, so these are the classic white Highborne ruins set it's styled on.
+    zephras = {
+        name = "Zephras Isle",
+        varnish = 0.3,
+        roles = {
+            wall = { 0.49, 0.49, 0.49 },
+            post = { 0.64, 0.64, 0.64 },
+            beam = { 0.45, 0.47, 0.47 },
+            trim = { 0.52, 0.53, 0.55 },
+            bracket = { 0.42, 0.42, 0.43 },
+            shelf = { 0.46, 0.45, 0.45 },
+            deck = { 0.52, 0.50, 0.51 },
+            counter = { 0.50, 0.48, 0.49 },
+            counterTrim = { 0.49, 0.49, 0.51 },
+            counterTop = { 0.56, 0.54, 0.54 },
+            base = { 0.46, 0.45, 0.45 },
+            plinth = { 0.56, 0.54, 0.54 },
+        },
+        materials = {
+            wall = { file = 327690, size = 256, tint = ZEPH_STONE },                  -- nightelf_wall_bottom_white: fluting
+            post = { file = 327688, band = { 0.30, 0.60 }, axis = "v", tint = ZEPH_STONE }, -- nightelf_column_white
+            beam = { file = 327691, band = { 0.28, 0.75 }, tint = ZEPH_STONE },       -- nightelf_trims_white: teal scrolls
+            trim = { file = 327691, band = { 0.03, 0.26 }, tint = ZEPH_STONE },       -- trims_white: leaf band
+            bracket = { file = 327687, rect = { 0.25, 0.75, 0.44, 0.94 }, tint = ZEPH_STONE }, -- brick_arch_white: capital
+            shelf = { file = 334953, band = { 0.10, 0.56 }, tint = ZEPH_STONE },      -- nightelf_brick_swirly_white
+            deck = { file = 327692, size = 128, tint = ZEPH_STONE },                  -- nightelf_floor_white: flagstones
+            counter = { file = 327696, size = 160, tint = ZEPH_STONE },               -- nightelf_wall_panel_white: arches
+            counterTrim = { file = 327691, size = 128, tint = ZEPH_STONE },
+            counterTop = { file = 331481, size = 128, tint = ZEPH_STONE, sheen = 0.8 }, -- nightelf_slate_white: marble
+            base = { file = 334955, band = { 0.55, 1.00 }, tint = ZEPH_STONE },       -- nightelf_trims_inside_white: blocks
+            plinth = { file = 331481, size = 96, tint = ZEPH_STONE, sheen = 0.8 },
+        },
+    },
 }
 Theme.DEFAULT = "workshop"
 Theme.current = Theme.list[Theme.DEFAULT]
@@ -268,6 +306,11 @@ local MAP_THEMES = {
     [198] = "nightelf",   -- Mount Hyjal
     [641] = "nightelf",   -- Val'sharah
 }
+-- WoW Forever numbers its maps separately: there, 2521 is Zephras Isle (Valanaar, Thendal and the
+-- rest of the isle sit inside it). Retail may use the same number for another map.
+if addon.IS_FOREVER then
+    MAP_THEMES[2521] = "zephras"
+end
 -- English map names, as a fallback for maps whose IDs aren't listed (the Midnight Silvermoon and
 -- Eversong, or the old-world maps on clients that number them differently). Only matches on
 -- English clients.
@@ -299,6 +342,8 @@ local NAME_THEMES = {
     ["Val'sharah"] = "nightelf",
     ["Amirdrassil"] = "nightelf",
     ["Bel'ameth"] = "nightelf",
+    ["Zephras Isle"] = "zephras",
+    ["Valanaar"] = "zephras",
 }
 
 -- The player's map and its parents, most specific first: { { id = , name = }, ... }.
@@ -371,6 +416,7 @@ function Theme.Slash(arg)
     local out = "|cffffd100VenStore:|r "
     arg = arg and strtrim(arg):lower() or ""
     if arg == "darnassus" then arg = "nightelf" end -- the theme is shown as Darnassus; its key stays nightelf
+    if arg == "zephras isle" or arg == "zephras isles" then arg = "zephras" end
     if arg == "auto" then
         if addon.db then addon.db.theme = nil end
         Theme.Refresh()

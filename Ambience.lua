@@ -86,6 +86,14 @@ local STYLES = {
         },
         awning = { { 0.56, 0.40, 0.24 }, { 0.42, 0.16, 0.10 } },
     },
+    zephras = {
+        window = {                                                                   -- pale elven stone
+            w = 96, h = 140, border = 11, lintel = true,
+            frame = { file = 331481, size = 96, tint = { 0.90, 0.95, 1.00 } },     -- nightelf_slate_white
+            glass = { file = 130143, rect = { 0.00, 0.31, 0.00, 0.50 } },          -- mm_strmwnd_hwindows_01
+        },
+        awning = { { 0.24, 0.50, 0.66 }, { 0.90, 0.90, 0.86 } },                     -- Zephras blue and white
+    },
 }
 local function StyleFor(key) return STYLES[key] or STYLES.workshop end
 
@@ -579,6 +587,8 @@ local WILDS = {
                   ground = { 0.28, 0.36, 0.16 }, horizon = 200 },
     kultiras = { tint = { 1.05, 0.86, 0.64 }, layers = ELWYNN, forest = "elwynn",            -- autumn woods of Tiragarde and Drustvar
                  ground = { 0.34, 0.32, 0.16 }, horizon = 200 },
+    zephras = { tint = { 0.84, 0.96, 1.05 }, layers = ELWYNN, forest = "elwynn",             -- the isle's blue-green pine woods
+                ground = { 0.22, 0.34, 0.24 }, horizon = 200 },
     nightelf = { -- Ashenvale and the night elf forests
         tint = { 0.82, 0.95, 1.0 }, forest = "ashenvale", ground = { 0.14, 0.24, 0.20 }, horizon = 210,
         layers = {
@@ -1829,6 +1839,8 @@ local BREEZE = {
     default = { file = 538985, length = 30 },   -- sound/ambience/weather/snowlight.ogg
     orgrimmar = { file = 538988, length = 60 }, -- sandstormlight.ogg: dry wind over the Barrens
 }
+-- Zephras Isle's own wind (amb_zephrasisle.ogg, 65.5 s). Only WoW Forever has the file.
+if addon.IS_FOREVER then BREEZE.zephras = { file = 7519862, length = 65 } end
 local breeze = { handles = {} }
 
 local function StopBreeze()

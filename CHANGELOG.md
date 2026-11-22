@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.0
+
+### Added
+- **Zephras Isle theme (WoW Forever):** at vendors on Zephras Isle, the shop is built from pale Highborne stone: fluted walls and columns, scrolled friezes with teal inlay, carved arch panels and polished marble. Outdoors the stall gets a blue and white awning, blue-green woods and the isle's own wind. Pick it anywhere with the settings menu or `/venstore theme zephras`.
+
 ## 1.6.0
 
 ### Added

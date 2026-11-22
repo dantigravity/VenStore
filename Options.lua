@@ -8,7 +8,7 @@ local ShelfFrame = addon.ShelfFrame
 local Options = {}
 addon.Options = Options
 
-local THEME_ORDER = { "workshop", "stormwind", "nightelf", "kultiras", "silvermoon", "orgrimmar" }
+local THEME_ORDER = { "workshop", "stormwind", "nightelf", "kultiras", "silvermoon", "orgrimmar", "zephras" }
 local PLACES = {
     { key = nil,       label = "Auto" },
     { key = "indoor",  label = "Indoors" },
